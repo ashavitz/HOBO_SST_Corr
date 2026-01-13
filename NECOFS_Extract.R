@@ -66,7 +66,9 @@ nearest_node <- function(lon, lat, lon0, lat0) {
 site_coords$nearest_node <- NA_integer_
 site_coords$node_lat <- NA
 site_coords$node_lon <- NA
-site_coords$node_tempC_bot <- NA
+
+# Create an empty list of dfs the length of site_coords (one df for each site)
+hourly_temps <- vector("list", nrow(site_coords))
 
 # Iterate through site coordinates df identifying the closest node and corresponding coordinates
 for (i in seq_len(nrow(site_coords))) {
@@ -80,17 +82,29 @@ for (i in seq_len(nrow(site_coords))) {
   site_coords$node_lat[i] <- lat[idx]
   site_coords$node_lon[i] <- lon[idx]
   
-  # # Determine index 
-  # siglay_node <- siglay_matrix[idx, ]
-  # k_bot  <- which.min(siglay_node) 
+  # Get all temp measurements for one node at lowest siglay (siglay index = 10)
+  ts <- ncvar_get(nc, "temp",
+                  start = c(idx, 10, 1),  # (node index, sigma-layer index, first time index)
+                  count = c(1, 1, -1))    # (one node, one sigma layer, all times)
+  ts <- as.numeric(ts)
   
-  # Determine the bottom temperature of the nearest node (idx), for the layer closest to the bottom (10), for the first time instance (1).
-  site_coords$node_tempC_bot[i] <- ncvar_get(nc, "temp",
-                                             start = c(idx, 10, 1),
-                                             count = c(1, 1, 1))
+  # Build an hourly time series table for this site (one row per model timestamp) with temperature at the nearest node
+  hourly_temps[[i]] <- data.frame(
+    site_id = site_coords$site.id[i],
+    time = Times,
+    temp = as.numeric(ts)
+  )
 }
 
-#TODO
-# Extract all temps by day and create daily average bottom temp at each site.
+# Calculate daily mean and median temps by site.
+daily_temps <- do.call(rbind, hourly_temps) |> 
+  mutate(date = as.Date(time, tz = "UTC")) |> 
+  group_by(site_id, date) |> 
+  summarize(
+    temp_daily_mean = mean(temp, na.rm = TRUE),
+    temp_daily_median = median(temp, na.rm = TRUE),
+    .groups = "drop"
+  )
 
+# Close .nc file
 nc_close(nc)
