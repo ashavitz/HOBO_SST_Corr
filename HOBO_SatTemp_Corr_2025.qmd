@@ -1,0 +1,1866 @@
+---
+title: "HOBO_SatTemp_Corr_2025"
+author: "Aaron Shavitz, Forest Schenck"
+format: 
+  pdf:
+    warning: false
+    message: false
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+
+```{r}
+# Packages
+library(tidyr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(ggpmisc) # for annotating plots with p & R2 of fitted polynomial via stat_poly_eq()
+library(glue) #for plot function code; plot title function
+library(purrr) #for plot function code; map function
+library(zoo) #approx nas from neighbors
+
+#GAMs
+library(mgcv)
+
+#Maps
+library(maps)
+library(mapdata)
+library(mapproj)
+library(ggnewscale)
+
+#ERRDAP Data Access
+library(rerddap) # For reading ERDDAP data
+library(rerddapXtracto)
+```
+
+
+```{r}
+# # Data upload EG 2024-2025
+#
+# d.flw.stage.WHOI <- read.csv("Data/whoi.eelgrass.flw.stage.data.csv")
+# 
+# d.flw.den.WHOI <- read.csv("Data/whoi.eelgrass.density.data.csv")
+#
+# d.flw.stage.RI.SNEP <- read.csv("Data/RI.snep.eelgrass.flw.stage.data.master.csv")
+# 
+# d.flw.den.RI.SNEP <- read.csv("Data/RI.snep.eelgrass.density.data.master.csv")
+# 
+# d.flw.stage.MA.SNEP <- read.csv("Data/snep.eelgrass.flw.stage.data.csv")
+# 
+# d.flw.den.MA.SNEP <- read.csv("Data/snep.eelgrass.density.data.csv")
+# 
+# d.flw.den.MApart.SNEP <- read.csv("Data/snep.mapartners.eelgrass.density.data.csv")
+# 
+# d.flw.stage.MApart.SNEP <- read.csv("Data/snep.mapartners.eelgrass.flw.stage.data.csv")
+```
+
+```{r}
+# Data upload Hobos (temp/light) for sites with full 2025 data
+d.t.AQ.1 <- read.csv("Data/Hobo/AQ_21177827.csv")
+d.t.AQ.2 <- read.csv("Data/Hobo/AQ_21258480.csv")
+d.t.AQ.3 <- read.csv("Data/Hobo/AQ_10625902.csv")
+
+d.t.CB.1 <- read.csv("Data/Hobo/CB_21258498.csv")
+d.t.CB.2 <- read.csv("Data/Hobo/CB_21258495.csv")
+d.t.CB.3 <- read.csv("Data/Hobo/CB_21258487.csv")
+
+d.t.DC.1 <- read.csv("Data/Hobo/DC_21258490.csv")
+d.t.DC.2 <- read.csv("Data/Hobo/DC_21258491.csv")
+d.t.DC.3 <- read.csv("Data/Hobo/DC_21258483.csv")
+
+d.t.SH.1 <- read.csv("Data/Hobo/SH_21177828.csv")
+d.t.SH.2 <- read.csv("Data/Hobo/SH_21258490.csv")
+d.t.SH.3 <- read.csv("Data/Hobo/SH_21982356.csv")
+
+d.t.WB.1 <- read.csv("Data/Hobo/WB_21177828.csv")
+d.t.WB.2 <- read.csv("Data/Hobo/WB_21258496.csv")
+d.t.WB.3 <- read.csv("Data/Hobo/WB_22288916.csv")
+
+d.t.CC.1 <- read.csv("Data/Hobo/CC_21982329.csv")
+d.t.CC.2 <- read.csv("Data/Hobo/CC_21982356.csv")
+d.t.CC.3 <- read.csv("Data/Hobo/CC_21982338.csv")
+
+d.t.OB.1 <- read.csv("Data/Hobo/OB_21982331.csv")
+d.t.OB.2 <- read.csv("Data/Hobo/OB_21982358.csv")
+d.t.OB.3 <- read.csv("Data/Hobo/OB_21982330.csv")
+
+d.t.WC.1 <- read.csv("Data/Hobo/WC_21982332.csv")
+d.t.WC.2 <- read.csv("Data/Hobo/WC_21982360.csv")
+d.t.WC.3 <- read.csv("Data/Hobo/WC_21982329.csv")
+
+d.t.GB.1 <- read.csv("Data/Hobo/GB_21982334.csv")
+d.t.GB.2 <- read.csv("Data/Hobo/GB_21982330.csv")
+d.t.GB.3 <- read.csv("Data/Hobo/GB_21982334_2025.csv")
+
+d.t.NK.1 <- read.csv("Data/Hobo/RI/NK_21982367.csv")
+d.t.NK.2 <- read.csv("Data/Hobo/RI/NK_21982359.csv")
+
+d.t.JB.1 <- read.csv("Data/Hobo/RI/JB_21982339_2025.csv")
+d.t.JB.2 <- read.csv("Data/Hobo/RI/JB_22329183.csv")
+
+d.t.CL.1 <- read.csv("Data/Hobo/RI/CL_21982347.csv")
+
+```
+
+***
+
+# Data Carpentry Hobos
+## AQ
+```{r, message=FALSE}
+d.t.AQ.1.water <- d.t.AQ.1 |>
+  mutate(site.id = "AQ") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-05-07 10:15") |>
+  filter(date.time <= "2024-09-30 10:45")
+
+d.t.AQ.2.water <- d.t.AQ.2 |>
+  mutate(site.id = "AQ") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-09-30 11:00") |>
+  filter(date.time <= "2025-05-08 11:00")
+
+d.t.AQ.3.water <- d.t.AQ.3 |>
+  mutate(site.id = "AQ") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-05-08 11:15") |>
+  filter(date.time <= "2025-09-24 10:15")
+
+d.t.AQ.water <- bind_rows(d.t.AQ.1.water, d.t.AQ.2.water, d.t.AQ.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.AQ.water)
+
+
+ggplot(data = d.t.AQ.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+  
+d.t.AQ.daily.range <- d.t.AQ.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+ggplot(data = d.t.AQ.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.AQ.GDD <- d.t.AQ.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.AQ.GDD <- d.t.AQ.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+  
+ggplot(data = d.t.AQ.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+
+```
+
+## CB
+```{r, message=FALSE}
+d.t.CB.1.water <- d.t.CB.1 |>
+  mutate(site.id = "CB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-05-07 13:30") |>
+  filter(date.time <= "2024-09-30 12:30")
+
+d.t.CB.2.water <- d.t.CB.2 |>
+  mutate(site.id = "CB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-09-30 12:45") |>
+  filter(date.time <= "2025-05-08 15:00")
+
+d.t.CB.3.water <- d.t.CB.3 |>
+  mutate(site.id = "CB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-05-08 15:15") |>
+  filter(date.time <= "2025-09-15 9:15")
+
+d.t.CB.water <- bind_rows(d.t.CB.1.water, d.t.CB.2.water, d.t.CB.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.CB.water)
+
+
+ggplot(data = d.t.CB.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+
+d.t.CB.daily.range <- d.t.CB.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+ggplot(data = d.t.CB.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.CB.GDD <- d.t.CB.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.CB.GDD <- d.t.CB.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+  
+ggplot(data = d.t.CB.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+```
+
+## DC
+```{r, message=FALSE}
+d.t.DC.1.water <- d.t.DC.1 |>
+  mutate(site.id = "DC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-05-07 14:00") |>
+  filter(date.time <= "2024-09-30 13:00")
+
+d.t.DC.2.water <- d.t.DC.2 |>
+  mutate(site.id = "DC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-09-30 13:15") |>
+  filter(date.time <= "2025-05-08 14:00")
+
+d.t.DC.3.water <- d.t.DC.3 |>
+  mutate(site.id = "DC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-05-08 14:15") |>
+  filter(date.time <= "2025-10-10 11:30")
+
+d.t.DC.water <- bind_rows(d.t.DC.1.water, d.t.DC.2.water, d.t.DC.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.DC.water)
+
+
+ggplot(data = d.t.DC.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+d.t.DC.daily.range <- d.t.DC.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+ggplot(data = d.t.DC.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.DC.GDD <- d.t.DC.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.DC.GDD <- d.t.DC.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+  
+ggplot(data = d.t.DC.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+```
+
+## SH*
+```{r, message=FALSE}
+d.t.SH.1.water <- d.t.SH.1 |>
+  mutate(site.id = "SH") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-05-15 10:45") |>
+  filter(date.time <= "2024-10-08 9:00")
+
+d.t.SH.2.water <- d.t.SH.2 |>
+  mutate(site.id = "SH") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-10-08 9:15") |>
+  filter(date.time <= "2025-06-04 11:15")
+
+d.t.SH.3.water <- d.t.SH.3 |>
+  mutate(site.id = "SH") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-06-04 11:30") |>
+  filter(date.time <= "2025-09-04 14:45")
+
+d.t.SH.water <- bind_rows(d.t.SH.1.water, d.t.SH.2.water, d.t.SH.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.SH.water)
+
+
+ggplot(data = d.t.SH.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+d.t.SH.daily.range <- d.t.SH.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+#Exclude +/- 2 hrs low tides </= -1 MLLW at Dux station
+
+ggplot(data = d.t.SH.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.SH.GDD <- d.t.SH.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.SH.GDD <- d.t.SH.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+  
+ggplot(data = d.t.SH.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+
+```
+
+## WB
+```{r, message=FALSE}
+d.t.WB.1.water <- d.t.WB.1 |>
+  mutate(site.id = "WB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-10-22 12:45") |>
+  filter(date.time <= "2025-05-08 11:45")
+
+d.t.WB.2.water <- d.t.WB.2 |>
+  mutate(site.id = "WB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-05-08 12:00") |>
+  filter(date.time <= "2025-07-15 10:45")
+
+d.t.WB.3.water <- d.t.WB.3 |>
+  mutate(site.id = "WB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-07-15 11:00") |>
+  filter(date.time <= "2025-10-22 11:00")
+
+d.t.WB.water <- bind_rows(d.t.WB.1.water, d.t.WB.2.water, d.t.WB.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.WB.water)
+
+
+ggplot(data = d.t.WB.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+d.t.WB.daily.range <- d.t.WB.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+ggplot(data = d.t.WB.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.WB.GDD <- d.t.WB.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.WB.GDD <- d.t.WB.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+  
+ggplot(data = d.t.WB.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+
+```
+
+## CC
+```{r}
+d.t.CC.1.water <- d.t.CC.1 |>
+  mutate(site.id = "CC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-04-16 9:45") |>
+  filter(date.time <= "2024-11-20 8:15")
+
+# str(d.t.CC.1.water)
+
+d.t.CC.2.water <- d.t.CC.2 |>
+  mutate(site.id = "CC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-11-20 8:30") |>
+  filter(date.time <= "2025-05-08 11:45")
+
+d.t.CC.3.water <- d.t.CC.3 |>
+  mutate(site.id = "CC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-05-08 12:00") |>
+  filter(date.time <= "2025-8-20 11:15")
+
+d.t.CC.water <- bind_rows(d.t.CC.1.water, d.t.CC.2.water, d.t.CC.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.CC.water)
+
+
+ggplot(data = d.t.CC.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+d.t.CC.daily.range <- d.t.CC.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+ggplot(data = d.t.CC.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.CC.GDD <- d.t.CC.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.CC.GDD <- d.t.CC.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+
+ggplot(data = d.t.CC.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+
+```
+
+## OB
+```{r}
+d.t.OB.1.water <- d.t.OB.1 |>
+  mutate(site.id = "OB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-04-16 13:00") |>
+  filter(date.time <= "2024-11-20 10:45")
+
+d.t.OB.2.water <- d.t.OB.2 |>
+  mutate(site.id = "OB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-11-20 11:00") |>
+  filter(date.time <= "2025-05-08 12:45")
+
+d.t.OB.3.water <- d.t.OB.3 |>
+  mutate(site.id = "OB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-05-08 13:00") |>
+  filter(date.time <= "2025-8-26 17:30")
+
+d.t.OB.water <- bind_rows(d.t.OB.1.water, d.t.OB.2.water, d.t.OB.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.OB.water)
+
+
+ggplot(data = d.t.OB.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+d.t.OB.daily.range <- d.t.OB.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+ggplot(data = d.t.OB.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.OB.GDD <- d.t.OB.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.OB.GDD <- d.t.OB.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+
+ggplot(data = d.t.OB.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+
+```
+
+## WC*
+```{r}
+d.t.WC.1.water <- d.t.WC.1 |>
+  mutate(site.id = "WC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-04-17 10:45") |>
+  filter(date.time <= "2024-11-20 12:00")
+
+d.t.WC.2.water <- d.t.WC.2 |>
+  mutate(site.id = "WC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-11-20 12:15") |>
+  filter(date.time <= "2025-05-01 15:45")
+
+d.t.WC.3.water <- d.t.WC.3 |>
+  mutate(site.id = "WC") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-05-01 16:00") |>
+  filter(date.time <= "2025-08-06 15:00")
+
+d.t.WC.water <- bind_rows(d.t.WC.1.water, d.t.WC.2.water, d.t.WC.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.WC.water)
+
+
+ggplot(data = d.t.WC.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+
+d.t.WC.daily.range <- d.t.WC.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+#Exclude +/- 2 hrs low tides </= -0.25 MLLW at Monument Beach station
+#Also exclude data with values < 0 C
+#This data set tricky because hard to parse natural water temp variation from logger going dry.
+
+ggplot(data = d.t.WC.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.WC.GDD <- d.t.WC.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.WC.GDD <- d.t.WC.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+
+ggplot(data = d.t.WC.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+```
+
+## GB
+```{r}
+d.t.GB.1.water <- d.t.GB.1 |>
+  mutate(site.id = "GB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-04-17 12:30") |>
+  filter(date.time <= "2024-11-20 15:15")
+
+d.t.GB.2.water <- d.t.GB.2 |>
+  mutate(site.id = "GB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-11-20 15:19") |>
+  filter(date.time <= "2025-05-01 17:49")
+
+d.t.GB.3.water <- d.t.GB.3 |>
+  mutate(site.id = "GB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-05-01 18:15") |>
+  filter(date.time <= "2025-08-21 15:00")
+
+d.t.GB.water <- bind_rows(d.t.GB.1.water, d.t.GB.2.water, d.t.GB.3.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.GB.water)
+
+
+ggplot(data = d.t.GB.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+
+d.t.GB.daily.range <- d.t.GB.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+#Anomalous low tide 2/18 2025 - exclude data from times tide < -1 ft MLLW , see noaa chart woods hole
+
+start.time <- ymd_hm("2025-02-18 06:00", tz ="America/New_York")
+end.time <- ymd_hm("2025-02-18 16:00" , tz ="America/New_York")
+interval_to_exclude <-interval(start.time, end.time)
+
+d.t.GB.water <- d.t.GB.water |>
+  filter(!(date.time %within% interval_to_exclude))
+
+# str(d.t.GB.water)
+
+ggplot(data = d.t.GB.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.GB.GDD <- d.t.GB.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.GB.GDD <- d.t.GB.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+
+ggplot(data = d.t.GB.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+
+```
+
+## NK*
+```{r}
+d.t.NK.1.water <- d.t.NK.1 |>
+  mutate(site.id = "NK") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-05-20 13:24") |>
+  filter(date.time <= "2024-09-11 10:09")
+
+
+d.t.NK.2.water <- d.t.NK.2 |>
+  mutate(site.id = "NK") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-1-29 15:30") |>
+  filter(date.time <= "2025-07-22 14:45")
+
+d.t.NK.water <- bind_rows(d.t.NK.1.water, d.t.NK.2.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.NK.water)
+
+
+ggplot(data = d.t.NK.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+
+d.t.NK.daily.range <- d.t.NK.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+#Some high negatives and positive anomalies need to be resolved
+
+ggplot(data = d.t.NK.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-5,30))
+
+d.t.NK.GDD <- d.t.NK.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.NK.GDD <- d.t.NK.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+
+ggplot(data = d.t.NK.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+
+```
+
+## JB*
+```{r}
+d.t.JB.1.water <- d.t.JB.1 |>
+  mutate(site.id = "JB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-01-29 13:12") |>
+  filter(date.time <= "2025-06-18 9:12")
+
+
+d.t.JB.2.water <- d.t.JB.2 |>
+  mutate(site.id = "JB") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = date.time - hours(1)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2025-6-18 09:30") |>
+  filter(date.time <= "2025-08-12 10:30")
+
+d.t.JB.water <- bind_rows(d.t.JB.1.water, d.t.JB.2.water) |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.JB.water)
+
+
+ggplot(data = d.t.JB.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+
+d.t.JB.daily.range <- d.t.JB.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T)
+
+ggplot(data = d.t.JB.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+#Need to fix range anomalies with NOAA tides
+
+d.t.JB.GDD <- d.t.JB.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.JB.GDD <- d.t.JB.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+
+ggplot(data = d.t.JB.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+
+```
+
+## CL*
+```{r}
+d.t.CL.1.water <- d.t.CL.1 |>
+  mutate(site.id = "CL") |>
+  mutate(date.time = mdy_hm(date.time)) |>
+  mutate(date.time = force_tz(date.time, "EST")) |>
+  mutate(date.time = with_tz(date.time, "America/New_York")) |>
+  filter(date.time >= "2024-12-10 9:15") |>
+  filter(date.time <= "2025-08-05 10:15")
+
+
+d.t.CL.water <- d.t.CL.1.water |>
+  mutate(j = as.POSIXlt(date.time)$yday + 1)
+
+# str(d.t.CL.water)
+
+
+ggplot(data = d.t.CL.water, aes(x = date.time, y = temp.C)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+
+d.t.CL.daily.range <- d.t.CL.water |>
+  mutate(date = as_date(date.time)) |>
+  group_by(site.id, date) |>
+  summarize(min.T = min(temp.C), max.T = max(temp.C), median.T = median(temp.C)) |>
+  mutate(delta.T = max.T - min.T) |>
+  mutate(median.T = na.approx(median.T))
+
+ggplot(data = d.t.CL.daily.range, aes(x = date, y = median.T)) +
+  geom_line() +
+  coord_cartesian(y = c(-1,28))
+
+#Need to fix anomalies with NOAA tides
+
+d.t.CL.GDD <- d.t.CL.daily.range |>
+  filter(date >= "2025-01-29") |>
+  mutate(GDD.2 = median.T-2) |>
+  mutate(across(GDD.2, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.2 = cumsum(GDD.2)) |>
+  mutate(GDD.4 = median.T-4) |>
+  mutate(across(GDD.4, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.4 = cumsum(GDD.4)) |>
+  mutate(GDD.6 = median.T-6) |>
+  mutate(across(GDD.6, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.6 = cumsum(GDD.6)) |>
+  mutate(GDD.8 = median.T-8) |>
+  mutate(across(GDD.8, ~ ifelse(. < 0, 0, .))) |>
+  mutate(GDD.8 = cumsum(GDD.8))
+
+d.t.CL.GDD <- d.t.CL.GDD |>
+  pivot_longer(cols = c("GDD.2", "GDD.4", "GDD.6", "GDD.8"), names_to = "Tbase", values_to = "GDD")
+
+ggplot(data = d.t.CL.GDD, aes(x = date, y = GDD, group = Tbase)) +
+  geom_line()
+```
+
+***
+
+# Merge HOBO data & Join site coordinates
+```{r}
+# Read in site coordinates
+site_coords <- read.csv("Data/site_coords.csv")
+
+# Bind all daily site data
+d.t.daily <- bind_rows(
+  d.t.AQ.daily.range,
+  d.t.CB.daily.range,
+  d.t.DC.daily.range,
+  d.t.SH.daily.range,
+  d.t.WB.daily.range, 
+  d.t.CC.daily.range,
+  d.t.OB.daily.range,
+  d.t.WC.daily.range,
+  d.t.GB.daily.range,
+  d.t.NK.daily.range,
+  d.t.JB.daily.range,
+  d.t.CL.daily.range
+  ) |> 
+  # Join site coordinates
+  left_join(site_coords, by = join_by(site.id)) |> 
+  relocate(c("latitude", "longitude"), .after = "site.id") |> 
+  ungroup()
+```
+
+***
+
+# NASA JPL Multi-scale Ultra-high Resolution (MUR) SST
+
+## Extract ERDDAP JPL satellite SST data 
+### jplMURSST41
+
+- NASA JPL 
+- Acknowledgement: These data were provided by JPL under support by NASA MEaSUREs program. 
+- Multi-scale Ultra-high Resolution (MUR) SST Analysis fv04.1, Global, 0.01°, 2002-present, Daily 
+- (https://coastwatch.pfeg.noaa.gov/erddap/info/jplMURSST41/index.html) 
+- Metadata: https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1
+
+```{r}
+# # Extract metadata from NOAA ERDDAP
+# # NOTE - jplMURSST41 is hosted at https://coastwatch.pfeg.noaa.gov/erddap, however this erddap
+# # appears to be intermittently inaccessible, causing script to crash.
+# jplMURSST41_info <-
+#   rerddap::info("jplMURSST41",
+#                 url="https://coastwatch.pfeg.noaa.gov/erddap"
+#                 )
+# 
+# # set parameters for use in rerddapXtracto::rxtracto()
+# parameter <- 'analysed_sst'
+# xcoord <- d.t.daily$longitude
+# ycoord <- d.t.daily$latitude
+# tcoord <- d.t.daily$date
+# 
+# # NOTE:
+# # - rxtracto() returns a list of statistics around the points provided via xcoord and ycoord
+# # - xlen and ylen denote the size (degrees) of the surrounding box from which you
+# #   want statistics. The default for these is 0, which will extract data for the grid cell
+# #   in which each coordinate provided falls.
+# # - Using xlen = 0.1 and ylen = 0.1 below, which will extract a mean sst from a square of
+# #   grid cells around each hobo buoy. This is helpful for when data is missing in the exact
+# #   grid cell the buoy falls within. An alternative option to consider is pulling sst for
+# #   the single containing grid cell, and only extracting an average of surrounding cells for
+# #   those buoys that return NA data.
+# 
+# extract <- rxtracto(jplMURSST41_info,
+#                     parameter = parameter,
+#                     tcoord = tcoord,
+#                     xcoord = xcoord, ycoord = ycoord,
+#                     xlen = 0.1, ylen = 0.1,
+#                     progress_bar = TRUE)
+# 
+# mean.SST_jpl <- extract$`mean analysed_sst`
+# 
+# # Export merged data to local files. (To avoid delays with ERDDAP access in the future.
+# # User can run the code above to re-download the latest data.
+# saveRDS(extract$`mean analysed_sst`, "Data/ERDDAP_Data/sst_JPL.rds")
+
+mean.SST_jpl <- readRDS("Data/ERDDAP_Data/sst_JPL.rds")
+```
+
+***
+
+# NOAA ACSPO Daily Global 0.02° Gridded Super-collated SST
+
+## Extract ERDDAP NOAA ACSPO satellite SST data 
+### noaacwLEOACSPOSSTL3SCDaily - Reanslysis ("Reserach grade"), *2 month delay*
+### noaacwLEOACSPOSSTL3SnrtCDaily - Near real time
+
+- Acknowledgement: These data were provided by Group for High Resolution Sea Surface Temperature (GHRSST) and the National Oceanic and Atmospheric Administration (NOAA). 
+- NOAA/NESDIS/STAR 
+- Sea-Surface Temperature, NOAA ACSPO Daily Global 0.02° Gridded Super-collated SST and Thermal Fronts Reanalysis, 2012-present, Daily (L3S-LEO degrees C) 
+- (https://coastwatch.noaa.gov/erddap/info/noaacwLEOACSPOSSTL3SCDaily/index.html)
+
+```{r}
+# # 
+# # Extract metadata from NOAA ERDDAP.
+# noaacwLEOACSPOSSTL3SCDaily_info <-
+#   rerddap::info(
+#     "noaacwLEOACSPOSSTL3SCDaily",
+#     url="https://coastwatch.noaa.gov/erddap"
+#   )
+
+# As of 12/01/25, noaacwLEOACSPOSSTL3SCDaily only includes data through 2025-09-19
+reanalysis_date <- "2025-09-19"
+d.t.daily_a <- filter(d.t.daily, date <= reanalysis_date)
+
+# # set parameters for use in rerddapXtracto::rxtracto()
+# parameter <- 'sea_surface_temperature'
+# xcoord <- d.t.daily_a$longitude
+# ycoord <- d.t.daily_a$latitude
+# tcoord <- d.t.daily_a$date
+# 
+# # Extract data from NOAA ERDDAP
+# 
+# # NOTE:
+# # - rxtracto() returns a list of statistics around the points provided via xcoord and ycoord
+# # - xlen and ylen denote the size (degrees) of the surrounding box from which you
+# #   want statistics. The default for these is 0, which will extract data for the grid cell
+# #   in which each coordinate provided falls.
+# # - Using xlen = 0.1 and ylen = 0.1 below, which will extract a mean sst from a square of
+# #   grid cells around each hobo buoy. This is helpful for when data is missing in the exact
+# #   grid cell the buoy falls within. An alternative option to consider is pulling sst for
+# #   the single containing grid cell, and only extracting an average of surrounding cells for
+# #   those buoys that return NA data.
+# 
+# extract <- rxtracto(noaacwLEOACSPOSSTL3SCDaily_info,
+#                     parameter = parameter,
+#                     tcoord = tcoord,
+#                     xcoord = xcoord, ycoord = ycoord,
+#                     xlen = 0.1, ylen = 0.1,
+#                     progress_bar = TRUE)
+#
+# mean.SST_acspo <- extract$`mean sea_surface_temperature`
+# 
+# # Export merged data to local files. (To avoid delays with ERDDAP access in the future.
+# # User can run the code above to re-download the latest data.
+# saveRDS(extract$`mean sea_surface_temperature`, "Data/ERDDAP_Data/sst_ACSPO.rds")
+
+mean.SST_acspo <- readRDS("Data/ERDDAP_Data/sst_ACSPO.rds")
+```
+
+
+```{r}
+# # THIS SECTION IS IN DRAFT
+# 
+# # Near Real Time
+# # Extract metadata from NOAA ERDDAP.
+# noaacwLEOACSPOSSTL3SnrtCDaily_info <-
+#   rerddap::info(
+#     "noaacwLEOACSPOSSTL3SnrtCDaily",
+#     url="https://coastwatch.noaa.gov/erddap"
+#   )
+# 
+# # As of 12/01/25, reanalysis data only includes data through 2025-09-19
+# # Thus the near real time data must pick up on 2025-09-20
+# d.t.daily_b <- filter(d.t.daily, date > reanalysis_date)
+# 
+# # set parameters for use in rerddapXtracto::rxtracto()
+# parameter <- 'sea_surface_temperature'
+# xcoord <- d.t.daily_b$longitude
+# ycoord <- d.t.daily_b$latitude
+# tcoord <- d.t.daily_b$date
+# 
+# # Extract data from NOAA ERDDAP
+# extract <- rxtracto(noaacwLEOACSPOSSTL3SnrtCDaily_info,
+#                     parameter = parameter,
+#                     tcoord = tcoord,
+#                     xcoord = xcoord, ycoord = ycoord,
+#                     xlen = 0, ylen = 0,
+#                     # interp = c("Nearest", "4"),
+#                     progress_bar = TRUE)
+# 
+# mean.SST_acspo_b <- extract$`mean sea_surface_temperature`
+# 
+# # Export merged data to local files. (To avoid delays with ERDDAP access in the future.
+# # User can run the code above to re-download the latest data.
+# # saveRDS(extract$`mean sea_surface_temperature`, "Data/ERDDAP_Data/sst_ACSPO.rds")
+```
+
+***
+
+# NOAA Coral Reef Watch Daily Global 5km Satellite SST (CoralTemp)
+
+## Extract ERDDAP NOAA Coral Reef Watch Daily Global 5km Satellite SST (CoralTemp)
+### noaacrwsstDaily
+
+- Acknowledgement: NOAA Coral Reef Watch Program 
+- NOAA/NESDIS/STAR Coral Reef Watch Program 
+- Sea Surface Temperature, NOAA Coral Reef Watch Daily Global 5km Satellite SST (CoralTemp), 1985-present, Daily 
+- (https://coastwatch.noaa.gov/erddap/info/noaacrwsstDaily/index.html)
+
+```{r}
+# # Extract metadata from NOAA ERDDAP.
+# noaacrwsstDaily_info <-
+#   rerddap::info(
+#     "noaacrwsstDaily",
+#     url="https://coastwatch.noaa.gov/erddap"
+#   )
+# 
+# # set parameters for use in rerddapXtracto::rxtracto()
+# parameter <- 'analysed_sst'
+# xcoord <- d.t.daily$longitude
+# ycoord <- d.t.daily$latitude
+# tcoord <- d.t.daily$date
+# 
+# # Extract data from NOAA ERDDAP
+# 
+# # NOTE:
+# # - rxtracto() returns a list of statistics around the points provided via xcoord and ycoord
+# # - xlen and ylen denote the size (degrees) of the surrounding box from which you
+# #   want statistics. The default for these is 0, which will extract data for the grid cell
+# #   in which each coordinate provided falls.
+# 
+# extract <- rxtracto(noaacrwsstDaily_info,
+#                     parameter = parameter,
+#                     tcoord = tcoord,
+#                     xcoord = xcoord, ycoord = ycoord,
+#                     xlen = 0.0, ylen = 0.0,
+#                     progress_bar = TRUE)
+# 
+# mean.SST_crw <- extract$`mean analysed_sst`
+# 
+# # Export merged data to local files. (To avoid delays with ERDDAP access in the future.
+# # User can run the code above to re-download the latest data.
+# saveRDS(extract$`mean analysed_sst`, "Data/ERDDAP_Data/sst_CRW.rds")
+
+mean.SST_crw <- readRDS("Data/ERDDAP_Data/sst_CRW.rds")
+```
+
+***
+
+# NOAA Geo-polar Blended Analysis Night Only, GHRSST, 5km SST
+
+## Extract ERDDAP NOAA Geo-polar Blended Analysis Night Only, GHRSST, 5km SST
+### noaacwBLENDEDCsstDaily
+- Acknowledgement: NOAA/NESDIS
+- Sea-Surface Temperature, NOAA Geo-polar Blended Analysis Night Only, GHRSST,
+  Near Real-Time, Global 5km, 2002-Present, Daily (degree C)
+- The Geo-Polar Blended Sea Surface Temperature (SST) Analysis combines multi-satellite
+  retrievals of sea surface temperature into a single analysis of SST. This analysis
+  includes only nighttime data.
+- (https://coastwatch.noaa.gov/erddap/info/noaacwBLENDEDCsstDaily/index.html)
+
+```{r}
+# # Extract metadata from NOAA ERDDAP.
+# noaacwBLENDEDCsstDaily_info <-
+#   rerddap::info(
+#     "noaacwBLENDEDCsstDaily",
+#     url="https://coastwatch.noaa.gov/erddap"
+#   )
+# 
+# # set parameters for use in rerddapXtracto::rxtracto()
+# parameter <- 'analysed_sst'
+# xcoord <- d.t.daily$longitude
+# ycoord <- d.t.daily$latitude
+# tcoord <- d.t.daily$date
+# 
+# # Extract data from NOAA ERDDAP
+# 
+# # NOTE:
+# # - rxtracto() returns a list of statistics around the points provided via xcoord and ycoord
+# # - xlen and ylen denote the size (degrees) of the surrounding box from which you
+# #   want statistics. The default for these is 0, which will extract data for the grid cell
+# #   in which each coordinate provided falls.
+# 
+# extract <- rxtracto(noaacwBLENDEDCsstDaily_info,
+#                     parameter = parameter,
+#                     tcoord = tcoord,
+#                     xcoord = xcoord, ycoord = ycoord,
+#                     xlen = 0.0, ylen = 0.0,
+#                     progress_bar = TRUE)
+# 
+# mean.SST_ghrsst <- extract$`mean analysed_sst`
+# 
+# # Export merged data to local files. (To avoid delays with ERDDAP access in the future.
+# # User can run the code above to re-download the latest data.
+# saveRDS(extract$`mean analysed_sst`, "Data/ERDDAP_Data/sst_GHRSST.rds")
+
+mean.SST_ghrsst <- readRDS("Data/ERDDAP_Data/sst_GHRSST.rds")
+```
+
+***
+
+
+
+```{r}
+# # IN DRAFT
+# 
+# # GOES MSG Daily Sea Surface Temperature Fields
+# 
+# ##
+# ### goesmsgSST
+# #- (https://cwcgom.aoml.noaa.gov/erddap/info/goesmsgSST/index.html)
+# ## Note - Applied Nearest 4 cell interpolation, followed by linear interpolation.
+# 
+# 
+# # Extract metadata from ERDDAP.
+# goesmsgSST_info <-
+#   rerddap::info(
+#     "goesmsgSST",
+#     url="https://cwcgom.aoml.noaa.gov/erddap"
+#   )
+# 
+# # set parameters for use in rerddapXtracto::rxtracto()
+# parameter <- 'sst'
+# xcoord <- d.t.daily$longitude
+# ycoord <- d.t.daily$latitude
+# tcoord <- d.t.daily$date
+# 
+# # Extract data from NOAA ERDDAP
+# extract <- rxtracto(goesmsgSST_info,
+#                     parameter = parameter,
+#                     tcoord = tcoord,
+#                     xcoord = xcoord, ycoord = ycoord,
+#                     xlen = 0.1, ylen = 0.1,
+#                     # interp = c("Nearest", "4"),
+#                     progress_bar = TRUE)
+# 
+# mean.SST_goes <- extract$`mean sst`
+# 
+# # Export merged data to local files. (To avoid delays with ERDDAP access in the future.
+# # User can run the code above to re-download the latest data.
+# saveRDS(extract$`mean sst`, "Data/ERDDAP_Data/sst_GOES.rds")
+# 
+# mean.SST_goes <- readRDS("Data/ERDDAP_Data/sst_GOES.rds")
+```
+
+***
+
+# Build complete dataframe with all temp data for analysis
+```{r}
+# Add SST fields to df
+d.t.daily <- d.t.daily |>
+  mutate(mean.SST_jpl = mean.SST_jpl,
+         mean.SST_crw = mean.SST_crw,
+         mean.SST_ghrsst = mean.SST_ghrsst)
+
+# ACSPO did not cover the full date range and must be added accordingly
+d.t.daily_a$mean.SST_acspo <- na.approx(mean.SST_acspo, na.rm = FALSE)
+
+d.t.daily <- left_join(
+  d.t.daily,
+  select(d.t.daily_a, site.id, date, mean.SST_acspo),
+  by = c("site.id", "date")
+  )
+
+# Pivot data long for plotting
+d.t.daily_long <- d.t.daily |> 
+  pivot_longer(
+    cols = c("median.T", "mean.SST_jpl", "mean.SST_acspo", "mean.SST_crw", "mean.SST_ghrsst"),
+    names_to = "water_temp_variable",
+    values_to = "temp_C"
+  ) |> select(-c("min.T", "max.T", "delta.T"))
+
+# Plot HOBO temp & Sat SSTs over time
+ggplot(d.t.daily, aes(x = date, y = mean.SST_jpl)) +
+  geom_line(linewidth = 0.5, alpha = 0.3) +
+  facet_wrap(~site.id) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(d.t.daily, aes(x = date, y = mean.SST_acspo)) +
+  geom_line(linewidth = 0.5, alpha = 0.3) +
+  facet_wrap(~site.id) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(caption = "Note: Linear interpolation used to infill missing values")
+
+ggplot(d.t.daily, aes(x = date, y = mean.SST_crw)) +
+  geom_line(linewidth = 0.5, alpha = 0.3) +
+  facet_wrap(~site.id) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(d.t.daily, aes(x = date, y = mean.SST_ghrsst)) +
+  geom_line(linewidth = 0.5, alpha = 0.3) +
+  facet_wrap(~site.id) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(d.t.daily_long, aes(x = date, y = temp_C, color = water_temp_variable)) +
+  geom_line(linewidth = 0.5, alpha = 0.3) +
+  facet_wrap(~site.id) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+***
+
+# Build GDD dataframes for each satellite dataset
+```{r}
+# JPL
+d.t.GDD_JPL <- d.t.daily |>
+  filter(date >= "2025-01-29") |>
+  filter(!is.na(mean.SST_jpl)) |> 
+  select(site.id, date, median.T, mean.SST_jpl) |> 
+  
+  # Calculate GDD values for Tbase = 2, 4, 6, and 8 degC
+  mutate(
+    # HOBO-based GDD
+    GDD_HOBO.2 = pmax(median.T - 2, 0),
+    GDD_HOBO.4 = pmax(median.T - 4, 0),
+    GDD_HOBO.6 = pmax(median.T - 6, 0),
+    GDD_HOBO.8 = pmax(median.T - 8, 0),
+
+    # JPL-based GDD
+    GDD_JPL.2 = pmax(mean.SST_jpl - 2, 0),
+    GDD_JPL.4 = pmax(mean.SST_jpl - 4, 0),
+    GDD_JPL.6 = pmax(mean.SST_jpl - 6, 0),
+    GDD_JPL.8 = pmax(mean.SST_jpl - 8, 0)
+  ) |> 
+  
+  # Cumulative sums of GDD
+  group_by(site.id) |>
+  mutate(
+    GDD_HOBO.2 = cumsum(GDD_HOBO.2),
+    GDD_HOBO.4 = cumsum(GDD_HOBO.4),
+    GDD_HOBO.6 = cumsum(GDD_HOBO.6),
+    GDD_HOBO.8 = cumsum(GDD_HOBO.8),
+
+    GDD_JPL.2 = cumsum(GDD_JPL.2),
+    GDD_JPL.4 = cumsum(GDD_JPL.4),
+    GDD_JPL.6 = cumsum(GDD_JPL.6),
+    GDD_JPL.8 = cumsum(GDD_JPL.8)
+  ) |> 
+  ungroup()
+
+# Filter long for later plotting options
+d.t.GDD_JPL_long <- d.t.GDD_JPL |> 
+  pivot_longer(cols = !c(site.id, date), names_to = "temp_metric", values_to = "value")
+
+
+# ACSPO
+d.t.GDD_ACSPO <- d.t.daily |>
+  filter(date >= "2025-01-29") |>
+  filter(!is.na(mean.SST_acspo)) |> 
+  select(site.id, date, median.T, mean.SST_acspo) |> 
+  
+  # Calculate GDD values for Tbase = 2, 4, 6, and 8 degC
+  mutate(
+    # HOBO-based GDD
+    GDD_HOBO.2 = pmax(median.T - 2, 0),
+    GDD_HOBO.4 = pmax(median.T - 4, 0),
+    GDD_HOBO.6 = pmax(median.T - 6, 0),
+    GDD_HOBO.8 = pmax(median.T - 8, 0),
+
+    # ACSPO-based GDD
+    GDD_ACSPO.2 = pmax(mean.SST_acspo - 2, 0),
+    GDD_ACSPO.4 = pmax(mean.SST_acspo - 4, 0),
+    GDD_ACSPO.6 = pmax(mean.SST_acspo - 6, 0),
+    GDD_ACSPO.8 = pmax(mean.SST_acspo - 8, 0)
+  ) |> 
+  
+  # Cumulative sums of GDD
+  group_by(site.id) |>
+  mutate(
+    GDD_HOBO.2 = cumsum(GDD_HOBO.2),
+    GDD_HOBO.4 = cumsum(GDD_HOBO.4),
+    GDD_HOBO.6 = cumsum(GDD_HOBO.6),
+    GDD_HOBO.8 = cumsum(GDD_HOBO.8),
+
+    GDD_ACSPO.2 = cumsum(GDD_ACSPO.2),
+    GDD_ACSPO.4 = cumsum(GDD_ACSPO.4),
+    GDD_ACSPO.6 = cumsum(GDD_ACSPO.6),
+    GDD_ACSPO.8 = cumsum(GDD_ACSPO.8)
+  ) |> 
+  ungroup()
+
+# Filter long for later plotting options
+d.t.GDD_ACSPO_long <- d.t.GDD_ACSPO |> 
+  pivot_longer(cols = !c(site.id, date), names_to = "temp_metric", values_to = "value")
+
+
+# CRW
+d.t.GDD_CRW <- d.t.daily |>
+  filter(date >= "2025-01-29") |>
+  filter(!is.na(mean.SST_crw)) |> 
+  select(site.id, date, median.T, mean.SST_crw) |> 
+  
+  # Calculate GDD values for Tbase = 2, 4, 6, and 8 degC
+  mutate(
+    # HOBO-based GDD
+    GDD_HOBO.2 = pmax(median.T - 2, 0),
+    GDD_HOBO.4 = pmax(median.T - 4, 0),
+    GDD_HOBO.6 = pmax(median.T - 6, 0),
+    GDD_HOBO.8 = pmax(median.T - 8, 0),
+
+    # CRW-based GDD
+    GDD_CRW.2 = pmax(mean.SST_crw - 2, 0),
+    GDD_CRW.4 = pmax(mean.SST_crw - 4, 0),
+    GDD_CRW.6 = pmax(mean.SST_crw - 6, 0),
+    GDD_CRW.8 = pmax(mean.SST_crw - 8, 0)
+  ) |> 
+  
+  # Cumulative sums of GDD
+  group_by(site.id) |>
+  mutate(
+    GDD_HOBO.2 = cumsum(GDD_HOBO.2),
+    GDD_HOBO.4 = cumsum(GDD_HOBO.4),
+    GDD_HOBO.6 = cumsum(GDD_HOBO.6),
+    GDD_HOBO.8 = cumsum(GDD_HOBO.8),
+
+    GDD_CRW.2 = cumsum(GDD_CRW.2),
+    GDD_CRW.4 = cumsum(GDD_CRW.4),
+    GDD_CRW.6 = cumsum(GDD_CRW.6),
+    GDD_CRW.8 = cumsum(GDD_CRW.8)
+  ) |> 
+  ungroup()
+
+# Filter long for later plotting options
+d.t.GDD_CRW_long <- d.t.GDD_CRW |> 
+  pivot_longer(cols = !c(site.id, date), names_to = "temp_metric", values_to = "value")
+
+
+# GHRSST
+d.t.GDD_GHRSST <- d.t.daily |>
+  filter(date >= "2025-01-29") |>
+  filter(!is.na(mean.SST_ghrsst)) |> 
+  select(site.id, date, median.T, mean.SST_ghrsst) |> 
+  
+  # Calculate GDD values for Tbase = 2, 4, 6, and 8 degC
+  mutate(
+    # HOBO-based GDD
+    GDD_HOBO.2 = pmax(median.T - 2, 0),
+    GDD_HOBO.4 = pmax(median.T - 4, 0),
+    GDD_HOBO.6 = pmax(median.T - 6, 0),
+    GDD_HOBO.8 = pmax(median.T - 8, 0),
+
+    # GHRSST-based GDD
+    GDD_GHRSST.2 = pmax(mean.SST_ghrsst - 2, 0),
+    GDD_GHRSST.4 = pmax(mean.SST_ghrsst - 4, 0),
+    GDD_GHRSST.6 = pmax(mean.SST_ghrsst - 6, 0),
+    GDD_GHRSST.8 = pmax(mean.SST_ghrsst - 8, 0)
+  ) |> 
+  
+  # Cumulative sums of GDD
+  group_by(site.id) |>
+  mutate(
+    GDD_HOBO.2 = cumsum(GDD_HOBO.2),
+    GDD_HOBO.4 = cumsum(GDD_HOBO.4),
+    GDD_HOBO.6 = cumsum(GDD_HOBO.6),
+    GDD_HOBO.8 = cumsum(GDD_HOBO.8),
+
+    GDD_GHRSST.2 = cumsum(GDD_GHRSST.2),
+    GDD_GHRSST.4 = cumsum(GDD_GHRSST.4),
+    GDD_GHRSST.6 = cumsum(GDD_GHRSST.6),
+    GDD_GHRSST.8 = cumsum(GDD_GHRSST.8)
+  ) |> 
+  ungroup()
+
+# Filter long for later plotting options
+d.t.GDD_GHRSST_long <- d.t.GDD_GHRSST |> 
+  pivot_longer(cols = !c(site.id, date), names_to = "temp_metric", values_to = "value")
+
+# Establish list of t_bases for later plotting loops
+t_bases <- c("2", "4", "6", "8")
+```
+
+***
+
+# Compare HOBO and NASA JPL satellite data 
+```{r}
+# Plot HOBO and JPL satellite SST against each other
+ggplot(d.t.daily, aes(x = mean.SST_jpl, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# Plot HOBO and JPL satellite SST lm by site
+
+# Determine y axis range and create vertical padded y_max so annotations will be visible
+y_max <- max(d.t.daily$median.T)
+y_min <- min(d.t.daily$median.T)
+range_size = y_max - y_min
+y_max_buffered <- y_max + (range_size * 0.2)
+
+ggplot(d.t.daily, aes(x = mean.SST_jpl, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~site.id) +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"), size = 1.5) + 
+  
+  # Add vertical padding for annotation visibility
+  scale_y_continuous(limits = c(NA, y_max_buffered))
+```
+
+***
+
+## Compare Growing Degree Days (GDD) - NASA JPL
+```{r}
+for (t_base in t_bases) {
+  
+  hobo_var <- paste0("GDD_HOBO.", t_base)
+  sst_var  <- paste0("GDD_JPL.",  t_base)
+  
+  # Plot HOBO and JPL Cumulative GDD over time
+  p1 <- ggplot(data = filter(d.t.GDD_JPL_long, temp_metric %in% c(hobo_var, sst_var)),
+               aes(x = date, y = value, color = temp_metric)) +
+    geom_line() +
+    facet_wrap(~site.id) +
+    labs(title = paste("Tbase =", t_base, "°C"))
+  
+  # Determine y axis range and create vertical padded y_max so annotations will be visible
+  y_max <- max(d.t.GDD_JPL[[hobo_var]], na.rm = TRUE)
+  y_min <- min(d.t.GDD_JPL[[hobo_var]], na.rm = TRUE)
+  range_size = y_max - y_min
+  y_max_buffered <- y_max + (range_size * 0.2)
+  
+  # Plot HOBO vs JPL Cumulative GDD
+  p2 <- ggplot(d.t.GDD_JPL, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point() + 
+    facet_wrap(~site.id) +
+    geom_smooth(method = "lm") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"), size = 1.5) +
+    # Add vertical padding for annotation visibility
+    scale_y_continuous(limits = c(NA, y_max_buffered))
+  
+  # Plot HOBO vs JPL Cumulative GDD 
+  p3 <- ggplot(d.t.GDD_JPL, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point(color = "grey") + 
+    geom_smooth(method = "lm", color = "red") +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"))
+  
+  p4 <- ggplot(d.t.GDD_JPL, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point(aes(color = site.id), alpha = 0.3) +
+    geom_smooth(method = "lm", color = "red", aes(group = 1)) +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"))
+
+  
+  # Print plots
+  print(p1)
+  print(p2)
+  print(p3)
+  print(p4)
+}
+```
+
+***
+
+# Compare HOBO and NASA ACSPO satellite data 
+```{r}
+# Plot HOBO and ACSPO satellite SST against each other
+ggplot(d.t.daily, aes(x = mean.SST_acspo, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# Plot HOBO and ACSPO satellite SST lm by site
+
+# Determine y axis range and create vertical padded y_max so annotations will be visible
+y_max <- max(d.t.daily$median.T)
+y_min <- min(d.t.daily$median.T)
+range_size = y_max - y_min
+y_max_buffered <- y_max + (range_size * 0.2)
+
+ggplot(d.t.daily, aes(x = mean.SST_acspo, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~site.id) +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"), size = 1.5) + 
+  
+  # Add vertical padding for annotation visibility
+  scale_y_continuous(limits = c(NA, y_max_buffered))
+```
+
+***
+
+## Compare Growing Degree Days (GDD) - NASA ACSPO
+```{r}
+for (t_base in t_bases) {
+  
+  hobo_var <- paste0("GDD_HOBO.", t_base)
+  sst_var  <- paste0("GDD_ACSPO.",  t_base)
+  
+  # Plot HOBO and ACSPO Cumulative GDD over time
+  p1 <- ggplot(data = filter(d.t.GDD_ACSPO_long, temp_metric %in% c(hobo_var, sst_var)),
+               aes(x = date, y = value, color = temp_metric)) +
+    geom_line() +
+    facet_wrap(~site.id) +
+    labs(title = paste("Tbase =", t_base, "°C"))
+  
+  # Determine y axis range and create vertical padded y_max so annotations will be visible
+  y_max <- max(d.t.GDD_ACSPO[[hobo_var]], na.rm = TRUE)
+  y_min <- min(d.t.GDD_ACSPO[[hobo_var]], na.rm = TRUE)
+  range_size = y_max - y_min
+  y_max_buffered <- y_max + (range_size * 0.2)
+  
+  # Plot HOBO vs ACSPO Cumulative GDD
+  p2 <- ggplot(d.t.GDD_ACSPO, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point() + 
+    facet_wrap(~site.id) +
+    geom_smooth(method = "lm") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"), size = 1.5) +
+    # Add vertical padding for annotation visibility
+    scale_y_continuous(limits = c(NA, y_max_buffered))
+  
+  # Plot HOBO vs ACSPO Cumulative GDD 
+  p3 <- ggplot(d.t.GDD_ACSPO, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point(color = "grey") + 
+    geom_smooth(method = "lm", color = "red") +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"))
+  
+  p4 <- ggplot(d.t.GDD_ACSPO, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point(aes(color = site.id), alpha = 0.3) +
+    geom_smooth(method = "lm", color = "red", aes(group = 1)) +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"))
+
+  
+  # Print plots
+  print(p1)
+  print(p2)
+  print(p3)
+  print(p4)
+}
+```
+
+***
+
+# Compare HOBO and NASA CRW satellite data 
+```{r}
+# Plot HOBO and CRW satellite SST against each other
+ggplot(d.t.daily, aes(x = mean.SST_crw, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# Plot HOBO and CRW satellite SST lm by site
+
+# Determine y axis range and create vertical padded y_max so annotations will be visible
+y_max <- max(d.t.daily$median.T)
+y_min <- min(d.t.daily$median.T)
+range_size = y_max - y_min
+y_max_buffered <- y_max + (range_size * 0.2)
+
+ggplot(d.t.daily, aes(x = mean.SST_crw, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~site.id) +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"), size = 1.5) + 
+  
+  # Add vertical padding for annotation visibility
+  scale_y_continuous(limits = c(NA, y_max_buffered))
+```
+
+***
+
+## Compare Growing Degree Days (GDD) - NASA CRW
+```{r}
+for (t_base in t_bases) {
+  
+  hobo_var <- paste0("GDD_HOBO.", t_base)
+  sst_var  <- paste0("GDD_CRW.",  t_base)
+  
+  # Plot HOBO and CRW Cumulative GDD over time
+  p1 <- ggplot(data = filter(d.t.GDD_CRW_long, temp_metric %in% c(hobo_var, sst_var)),
+               aes(x = date, y = value, color = temp_metric)) +
+    geom_line() +
+    facet_wrap(~site.id) +
+    labs(title = paste("Tbase =", t_base, "°C"))
+  
+  # Determine y axis range and create vertical padded y_max so annotations will be visible
+  y_max <- max(d.t.GDD_CRW[[hobo_var]], na.rm = TRUE)
+  y_min <- min(d.t.GDD_CRW[[hobo_var]], na.rm = TRUE)
+  range_size = y_max - y_min
+  y_max_buffered <- y_max + (range_size * 0.2)
+  
+  # Plot HOBO vs CRW Cumulative GDD
+  p2 <- ggplot(d.t.GDD_CRW, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point() + 
+    facet_wrap(~site.id) +
+    geom_smooth(method = "lm") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"), size = 1.5) +
+    # Add vertical padding for annotation visibility
+    scale_y_continuous(limits = c(NA, y_max_buffered))
+  
+  # Plot HOBO vs CRW Cumulative GDD 
+  p3 <- ggplot(d.t.GDD_CRW, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point(color = "grey") + 
+    geom_smooth(method = "lm", color = "red") +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"))
+  
+  p4 <- ggplot(d.t.GDD_CRW, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point(aes(color = site.id), alpha = 0.3) +
+    geom_smooth(method = "lm", color = "red", aes(group = 1)) +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"))
+
+  
+  # Print plots
+  print(p1)
+  print(p2)
+  print(p3)
+  print(p4)
+}
+```
+
+***
+
+# Compare HOBO and NASA GHRSST satellite data 
+```{r}
+# Plot HOBO and GHRSST satellite SST against each other
+ggplot(d.t.daily, aes(x = mean.SST_ghrsst, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# Plot HOBO and GHRSST satellite SST lm by site
+
+# Determine y axis range and create vertical padded y_max so annotations will be visible
+y_max <- max(d.t.daily$median.T)
+y_min <- min(d.t.daily$median.T)
+range_size = y_max - y_min
+y_max_buffered <- y_max + (range_size * 0.2)
+
+ggplot(d.t.daily, aes(x = mean.SST_ghrsst, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~site.id) +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"), size = 1.5) + 
+  
+  # Add vertical padding for annotation visibility
+  scale_y_continuous(limits = c(NA, y_max_buffered))
+```
+
+***
+
+## Compare Growing Degree Days (GDD) - NASA GHRSST
+```{r}
+for (t_base in t_bases) {
+  
+  hobo_var <- paste0("GDD_HOBO.", t_base)
+  sst_var  <- paste0("GDD_GHRSST.",  t_base)
+  
+  # Plot HOBO and GHRSST Cumulative GDD over time
+  p1 <- ggplot(data = filter(d.t.GDD_GHRSST_long, temp_metric %in% c(hobo_var, sst_var)),
+               aes(x = date, y = value, color = temp_metric)) +
+    geom_line() +
+    facet_wrap(~site.id) +
+    labs(title = paste("Tbase =", t_base, "°C"))
+  
+  # Determine y axis range and create vertical padded y_max so annotations will be visible
+  y_max <- max(d.t.GDD_GHRSST[[hobo_var]], na.rm = TRUE)
+  y_min <- min(d.t.GDD_GHRSST[[hobo_var]], na.rm = TRUE)
+  range_size = y_max - y_min
+  y_max_buffered <- y_max + (range_size * 0.2)
+  
+  # Plot HOBO vs GHRSST Cumulative GDD
+  p2 <- ggplot(d.t.GDD_GHRSST, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point() + 
+    facet_wrap(~site.id) +
+    geom_smooth(method = "lm") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"), size = 1.5) +
+    # Add vertical padding for annotation visibility
+    scale_y_continuous(limits = c(NA, y_max_buffered))
+  
+  # Plot HOBO vs GHRSST Cumulative GDD 
+  p3 <- ggplot(d.t.GDD_GHRSST, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point(color = "grey") + 
+    geom_smooth(method = "lm", color = "red") +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"))
+  
+  p4 <- ggplot(d.t.GDD_GHRSST, aes(x = .data[[hobo_var]], y = .data[[sst_var]])) +
+    geom_point(aes(color = site.id), alpha = 0.3) +
+    geom_smooth(method = "lm", color = "red", aes(group = 1)) +
+    # Annotate plot with simple linear model p-values and R2 values
+    stat_poly_eq(use_label("eq", "R2", "p"))
+
+  
+  # Print plots
+  print(p1)
+  print(p2)
+  print(p3)
+  print(p4)
+}
+```
