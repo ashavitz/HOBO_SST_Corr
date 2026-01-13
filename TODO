@@ -11,6 +11,13 @@ TODO
 
 # Questions for Tom about NECOFs model
 - What is the timeframe of hindcast data available? For example, can we get all of 2025?
+  - Timeframe: Currently there are hindcasts through 2021. Might take a while until they catch up to 2025.
 - How far out do the forecasts go? Could we forecast an entire field season?
+  - Only forecast out 3 or 5 days, depending on the resolution of the product.
 - Is there descriptive metadata available? To better understand the file dimensions and variables.
-- Is the geographical range limited to the mesh of points I made?
+  - Tom to check
+- Which Forecast (or Hindcast) product would be beset for our geographical area?
+  - Likely Mass Bays product for all that fall within it, unless the even-more-local inundation model outputs are finer resolution
+  - For those that fall outside, the Northeast forecast
+- Any guidance on easy ways to work with these large files? e.g. substting guidance
+  - Tom to check
