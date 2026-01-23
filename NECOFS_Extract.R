@@ -97,7 +97,7 @@ for (i in seq_len(nrow(site_coords))) {
 }
 
 # Calculate daily mean and median temps by site.
-daily_temps <- do.call(rbind, hourly_temps) |> 
+daily_temps <- bind_rows(hourly_temps) |> 
   mutate(date = as.Date(time, tz = "UTC")) |> 
   group_by(site_id, date) |> 
   summarize(
