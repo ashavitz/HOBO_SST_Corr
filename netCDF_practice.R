@@ -1,6 +1,8 @@
 library(RNetCDF)
 library(ncdf4)
+library(purrr)
 
+# ---- Explore NECOFS_MET_HINDCAST.nc ----
 opendap_url <- "http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forecasts/NECOFS_MET_HINDCAST.nc"
 
 nc <- nc_open(opendap_url)
@@ -48,7 +50,7 @@ tdata <- ncvar_get(nc, varid = "T2", verbose = TRUE)
 
 nc_close(nc)
 
-#----
+# ---- Explore NECOFS_FVCOM_OCEAN_MASSBAY_FORECAST.nc ----
 
 URL <- "http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forecasts/NECOFS_FVCOM_OCEAN_MASSBAY_FORECAST.nc"
 
@@ -207,3 +209,41 @@ ncatt_put(nc_out, 0, "Conventions", "CF-1.0")
 ncatt_put(nc_out, 0, "title", "Subset: temp at time=1, siglay=1 (FVCOM)")
 
 nc_close(nc_out)
+
+# ---- Explore NECOFS_FVCOM_OCEAN_NORTHEAST_FORECAST.nc ----
+URL <- "http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forecasts/NECOFS_FVCOM_OCEAN_NORTHEAST_FORECAST.nc?lon[0:1:207080],lat[0:1:207080],siglay[0:1:44][0:1:207080],time[0:1:2856],Times[0:1:2856],temp[0:1:2856][0:1:44][0:1:207080]"
+
+nc <- nc_open(URL)
+
+# View file information
+print(nc)
+
+# View dimension names and lengths
+names(nc$dim)
+map_dbl(nc$dim, ~ .x$len)
+
+# View variables names
+names(nc$var)
+
+# Check time range
+Times <- ncvar_get(nc, "Times")
+range(Times)
+
+# Extract all longitude and latitude values and check ranges
+lon <- ncvar_get(nc, "lon")
+lat <- ncvar_get(nc, "lat")
+
+range(lon, na.rm = TRUE)
+range(lat, na.rm = TRUE)
+
+# # Determine the number of time measurements made
+times_count <- nc$dim$time$len
+
+
+nc_close(nc)
+
+# ---- Explore NECOFS_FVCOM_OCEAN_NORTHEAST_FORECAST.nc with python via reticulate package ----
+# Load reticulate package to enable a python environment
+library(reticulate)
+
+
