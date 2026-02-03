@@ -1,13 +1,9 @@
 TODO
-- Extract NOAA Geo-polar Blended Analysis Diurnal Correction (Day+Night) in SST_Data_Extract
+- Compare original 3 datasets to determine initial recommendation.
 - Change ACSPO name
-- Finish extracting ACSPO ABI hourly data
-
--Extract ACSPO Global SST from ABI (GOES) data
-  - There is no ERDDAP access and the data is hourly, so this requires accessing hourly netcdf data
-    via the THREDDS server.
-- Update Jill and Forest if GOES is different, and on details of the utilized data products
 - Download depth for each GPS coordinate and include in model
+- Extract NOAA Geo-polar Blended Analysis Diurnal Correction (Day+Night) in SST_Data_Extract
+- Final step - create one final script or .qmd file that steps through process from start (raw data files) to finish
 
 # Questions for Tom about NECOFs model
 - What is the timeframe of hindcast data available? For example, can we get all of 2025?

@@ -1,0 +1,58 @@
+---
+title: "HOBO_SatTemp_Corr_2025"
+author: "Aaron Shavitz, Forest Schenck"
+format: 
+  pdf:
+    warning: false
+    message: false
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+
+```{r}
+# Packages
+library(tidyr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(ggpmisc) # for annotating plots with p & R2 of fitted polynomial via stat_poly_eq()
+library(glue) #for plot function code; plot title function
+library(purrr) #for plot function code; map function
+library(zoo) #approx nas from neighbors
+
+#GAMs
+library(mgcv)
+
+#Maps
+library(maps)
+library(mapdata)
+library(mapproj)
+library(ggnewscale)
+
+#ERRDAP Data Access
+library(rerddap) # For reading ERDDAP data
+library(rerddapXtracto)
+```
+
+
+```{r}
+# Read in site and satellite data (sst_hobo_sites.rds)
+
+# Compare daily values of interpolated data sets to HOBO data. Determine which has tightest correlation.
+
+# Filter to appropriate 2025 timeline.
+# Calculate GDD at Tbase = 3 degrees C for each data set
+
+# Compare GDD of sat data to HOBO data. Determine which has tightest correlation.
+
+
+
+
+
+# Load depth data (and tidal exchange data?)
+
+# Factor depth and tidal exchange data into LM
+```
