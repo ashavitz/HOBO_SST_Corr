@@ -54,10 +54,22 @@ temp_data_daily <- readRDS("Data/sst_hobo_sites.rds") |>
 # Tidal range data derived from: https://buzzardsbay.org/technical-data/tidal-datums-ma/interactive-tidal-datum-viewer/
 HOBO_Sites_MA_Bath_Tides <- read.csv("Data/HOBO_Sites_MA_Bath_Tides.csv") |> 
   select(site_id, depth_m, MN_FT) |> 
-  rename(site.id = site_id)
+  rename(
+    site.id = site_id,
+    tidal_range_FT = MN_FT) |> 
+  filter(depth_m <= 0) |> 
+  mutate(depth_m = -depth_m)
 
 # Join depth and tidal range data to daily temp data
 temp_data_daily <- left_join(temp_data_daily, HOBO_Sites_MA_Bath_Tides, by = "site.id")
+
+# Manually adding estimated tidal range of 3.47 for CL and JB (Rhode Island HOBOs) based on Newport RI Tidal Station: https://tidesandcurrents.noaa.gov/stationhome.html?id=8452660
+# This is a coarse estimation
+temp_data_daily <- temp_data_daily |> 
+  mutate(
+    tidal_range_FT = if_else(site.id == "CL", 3.47, tidal_range_FT),
+    tidal_range_FT = if_else(site.id == "JB", 3.47, tidal_range_FT)
+  )
 
 # Compare daily values of interpolated data sets to HOBO data. Determine which has tightest correlation.
 # Plot HOBO and JPL satellite SST against each other
@@ -107,37 +119,128 @@ temp_data_daily_2025 <- temp_data_daily |>
 
 # Compare GDD of sat data to HOBO data. Determine which has tightest correlation.
 #JPL
-ggplot(temp_data_daily_2025, aes(x = gdd.hobo.3, y = gdd.jpl.3)) +
+ggplot(temp_data_daily_2025, aes(x = gdd.jpl.3, y = gdd.hobo.3)) +
   geom_point(color = "grey") + 
   geom_smooth(method = "lm", color = "red") +
   # Annotate plot with simple linear model p-values and R2 values
   stat_poly_eq(use_label("eq", "R2", "p"))
 
 # LEO_L3S ACSPO
-ggplot(temp_data_daily_2025, aes(x = gdd.hobo.3, y = gdd.leol3s_acspo.3)) +
+ggplot(temp_data_daily_2025, aes(x = gdd.leol3s_acspo.3, y = gdd.hobo.3)) +
   geom_point(color = "grey") + 
   geom_smooth(method = "lm", color = "red") +
   # Annotate plot with simple linear model p-values and R2 values
   stat_poly_eq(use_label("eq", "R2", "p"))
 
 # CRW
-ggplot(temp_data_daily_2025, aes(x = gdd.hobo.3, y = gdd.crw.3)) +
+ggplot(temp_data_daily_2025, aes(x = gdd.crw.3, y = gdd.hobo.3)) +
   geom_point(color = "grey") + 
   geom_smooth(method = "lm", color = "red") +
   # Annotate plot with simple linear model p-values and R2 values
   stat_poly_eq(use_label("eq", "R2", "p"))
 
 
-# TODO
-# PRIOR TO INCLUSION OF DEPTH AND TIDES INTO MODEL, NEED TO FILTER OUT SITES W/0 THAT DATA
 
-# Factor depth and tidal exchange data into 
-temp_lm_1 <- lm(gdd.hobo.3 ~ gdd.jpl.3, data = temp_data_daily_2025)
+# Filter out sites without both bathymetry and tidal range data 
+temp_data_daily_2025_MA <- temp_data_daily_2025 |> 
+  filter(!is.na(depth_m), !is.na(tidal_range_FT))
+
+# Compare GDD of sat data to HOBO data, including depth data. Determine which has tightest correlation.
+#JPL
+ggplot(temp_data_daily_2025_MA, aes(x = gdd.jpl.3, y = gdd.hobo.3, color = depth_m)) +
+  geom_point() + 
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# LEO_L3S ACSPO
+ggplot(temp_data_daily_2025_MA, aes(x = gdd.leol3s_acspo.3, y = gdd.hobo.3, color = depth_m)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# CRW
+ggplot(temp_data_daily_2025_MA, aes(x = gdd.crw.3, y = gdd.hobo.3, color = depth_m)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+
+######
+
+
+# Filter out sites without tidal range data 
+temp_data_daily_2025_t <- temp_data_daily_2025 |> 
+  filter(!is.na(tidal_range_FT))
+
+# Compare GDD of sat data to HOBO data, including tidal range data. Determine which has tightest correlation.
+#JPL
+ggplot(temp_data_daily_2025_t, aes(x = gdd.jpl.3, y = gdd.hobo.3, color = tidal_range_FT)) +
+  geom_point() + 
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# LEO_L3S ACSPO
+ggplot(temp_data_daily_2025_t, aes(x = gdd.leol3s_acspo.3, y = gdd.hobo.3, color = tidal_range_FT)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# CRW
+ggplot(temp_data_daily_2025_t, aes(x = gdd.crw.3, y = gdd.hobo.3, color = tidal_range_FT)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+
+# Models with only sat temp
+temp_lm_1 <- lm(gdd.hobo.3 ~ gdd.jpl.3, data = temp_data_daily_2025_t)
 summary(temp_lm_1)
-abline(temp_lm_1, col = "red", lwd = 2)
+temp_lm_2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3, data = temp_data_daily_2025_t)
+summary(temp_lm_2)
+temp_lm_3 <- lm(gdd.hobo.3 ~ gdd.crw.3, data = temp_data_daily_2025_t)
+summary(temp_lm_3)
+
+# Factor tidal exchange data into 
+temp_lm_t1 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + tidal_range_FT, data = temp_data_daily_2025)
+summary(temp_lm_t1)
+temp_lm_t2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3 + tidal_range_FT, data = temp_data_daily_2025)
+summary(temp_lm_t2)
+temp_lm_t3 <- lm(gdd.hobo.3 ~ gdd.crw.3 + tidal_range_FT, data = temp_data_daily_2025)
+summary(temp_lm_t3)
+
+# Factor tidal exchange data into 
+temp_lm_td1 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + tidal_range_FT + depth_m, data = temp_data_daily_2025_MA)
+summary(temp_lm_td1)
+temp_lm_td2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3 + tidal_range_FT + depth_m, data = temp_data_daily_2025_MA)
+summary(temp_lm_td2)
+temp_lm_td3 <- lm(gdd.hobo.3 ~ gdd.crw.3 + tidal_range_FT + depth_m, data = temp_data_daily_2025_MA)
+summary(temp_lm_td3)
 
 
-temp_lm_2 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + predictor2, data = df)
+# TODO Complete draft plots of lms
+s <- summary(temp_lm_t2)
+b <- coef(temp_lm_t2)
 
+label_txt <- paste0(
+  "gdd.hobo.3 = ", round(b[1], 3),
+  " + ", round(b["gdd.leol3s_acspo.3"], 3), "·gdd.leol3s_acspo.3",
+  " + ", round(b["tidal_range_FT"], 3), "·tidal_range_FT\n",
+  "R² = ", round(s$r.squared, 3),
+  " | p(gdd) = ", signif(s$coefficients["gdd.leol3s_acspo.3","Pr(>|t|)"], 3),
+  " | p(tidal) = ", signif(s$coefficients["tidal_range_FT","Pr(>|t|)"], 3)
+)
 
+ggplot(temp_data_daily_2025_t,
+       aes(x = gdd.leol3s_acspo.3, y = gdd.hobo.3, color = tidal_range_FT)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red") +
+  annotate("text", x = Inf, y = Inf, label = label_txt,
+           hjust = 1.05, vjust = 1.2, size = 3.5) +
+  theme_bw()
 ```
