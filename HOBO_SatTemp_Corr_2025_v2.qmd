@@ -40,19 +40,104 @@ library(rerddapXtracto)
 
 ```{r}
 # Read in site and satellite data (sst_hobo_sites.rds)
+temp_data_daily <- readRDS("Data/sst_hobo_sites.rds") |> 
+  select(site.id, latitude, longitude, date, median.T, sst_jpl_interp, sst_acspo_interp, sst_crw) |> 
+  rename(
+    sst_jpl = sst_jpl_interp,
+    sst_leol3s_acspo = sst_acspo_interp
+    ) |> 
+  # Filter out sites where Coral Reef Watch sst column has no data
+  filter(!is.na(sst_crw))
+
+# Load depth and tidal range data
+# Depth based on bathymetry data from: https://www.sciencebase.gov/catalog/item/5a451a3ce4b0d05ee8bedfdc
+# Tidal range data derived from: https://buzzardsbay.org/technical-data/tidal-datums-ma/interactive-tidal-datum-viewer/
+HOBO_Sites_MA_Bath_Tides <- read.csv("Data/HOBO_Sites_MA_Bath_Tides.csv") |> 
+  select(site_id, depth_m, MN_FT) |> 
+  rename(site.id = site_id)
+
+# Join depth and tidal range data to daily temp data
+temp_data_daily <- left_join(temp_data_daily, HOBO_Sites_MA_Bath_Tides, by = "site.id")
 
 # Compare daily values of interpolated data sets to HOBO data. Determine which has tightest correlation.
+# Plot HOBO and JPL satellite SST against each other
+ggplot(temp_data_daily, aes(x = sst_jpl, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
 
-# Filter to appropriate 2025 timeline.
-# Calculate GDD at Tbase = 3 degrees C for each data set
+# Plot HOBO and LEO_L3S ACSPO satellite SST against each other
+ggplot(temp_data_daily, aes(x = sst_leol3s_acspo, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# Plot HOBO and CRW satellite SST against each other
+ggplot(temp_data_daily, aes(x = sst_crw, y = median.T)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# Calculate 2025 GDD at Tbase = 3 degrees
+temp_data_daily_2025 <- temp_data_daily |>
+  # Filter data to post 2024 to calculate 2025 GDD
+  filter(date >= "2025-01-01") |> 
+  # Calculate GDD for each data point
+  mutate(
+    gdd.hobo.3 = pmax(median.T - 3, 0),
+    gdd.jpl.3 = pmax(sst_jpl - 3, 0),
+    gdd.leol3s_acspo.3 = pmax(sst_leol3s_acspo - 3, 0),
+    gdd.crw.3 = pmax(sst_crw - 3, 0)
+  ) |> 
+  # Calculate GDD for each data set
+  group_by(site.id) |> 
+  mutate(
+    gdd.hobo.3 = cumsum(gdd.hobo.3),
+    gdd.jpl.3 = cumsum(gdd.jpl.3),
+    gdd.leol3s_acspo.3 = cumsum(gdd.leol3s_acspo.3),
+    gdd.crw.3 = cumsum(gdd.crw.3),
+    ) |> 
+  ungroup()
 
 # Compare GDD of sat data to HOBO data. Determine which has tightest correlation.
+#JPL
+ggplot(temp_data_daily_2025, aes(x = gdd.hobo.3, y = gdd.jpl.3)) +
+  geom_point(color = "grey") + 
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# LEO_L3S ACSPO
+ggplot(temp_data_daily_2025, aes(x = gdd.hobo.3, y = gdd.leol3s_acspo.3)) +
+  geom_point(color = "grey") + 
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# CRW
+ggplot(temp_data_daily_2025, aes(x = gdd.hobo.3, y = gdd.crw.3)) +
+  geom_point(color = "grey") + 
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
 
 
+# TODO
+# PRIOR TO INCLUSION OF DEPTH AND TIDES INTO MODEL, NEED TO FILTER OUT SITES W/0 THAT DATA
+
+# Factor depth and tidal exchange data into 
+temp_lm_1 <- lm(gdd.hobo.3 ~ gdd.jpl.3, data = temp_data_daily_2025)
+summary(temp_lm_1)
+abline(temp_lm_1, col = "red", lwd = 2)
 
 
+temp_lm_2 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + predictor2, data = df)
 
-# Load depth data (and tidal exchange data?)
 
-# Factor depth and tidal exchange data into LM
 ```
