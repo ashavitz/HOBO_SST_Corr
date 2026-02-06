@@ -14,27 +14,9 @@ execute:
 
 ```{r}
 # Packages
-library(tidyr)
 library(dplyr)
-library(lubridate)
 library(ggplot2)
 library(ggpmisc) # for annotating plots with p & R2 of fitted polynomial via stat_poly_eq()
-library(glue) #for plot function code; plot title function
-library(purrr) #for plot function code; map function
-library(zoo) #approx nas from neighbors
-
-#GAMs
-library(mgcv)
-
-#Maps
-library(maps)
-library(mapdata)
-library(mapproj)
-library(ggnewscale)
-
-#ERRDAP Data Access
-library(rerddap) # For reading ERDDAP data
-library(rerddapXtracto)
 ```
 
 
@@ -199,19 +181,19 @@ ggplot(temp_data_daily_2025_t, aes(x = gdd.crw.3, y = gdd.hobo.3, color = tidal_
 
 
 # Models with only sat temp
-temp_lm_1 <- lm(gdd.hobo.3 ~ gdd.jpl.3, data = temp_data_daily_2025_t)
+temp_lm_1 <- lm(gdd.hobo.3 ~ gdd.jpl.3, data = temp_data_daily_2025)
 summary(temp_lm_1)
-temp_lm_2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3, data = temp_data_daily_2025_t)
+temp_lm_2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3, data = temp_data_daily_2025)
 summary(temp_lm_2)
-temp_lm_3 <- lm(gdd.hobo.3 ~ gdd.crw.3, data = temp_data_daily_2025_t)
+temp_lm_3 <- lm(gdd.hobo.3 ~ gdd.crw.3, data = temp_data_daily_2025)
 summary(temp_lm_3)
 
 # Factor tidal exchange data into 
-temp_lm_t1 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + tidal_range_FT, data = temp_data_daily_2025)
+temp_lm_t1 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + tidal_range_FT, data = temp_data_daily_2025_t)
 summary(temp_lm_t1)
-temp_lm_t2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3 + tidal_range_FT, data = temp_data_daily_2025)
+temp_lm_t2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3 + tidal_range_FT, data = temp_data_daily_2025_t)
 summary(temp_lm_t2)
-temp_lm_t3 <- lm(gdd.hobo.3 ~ gdd.crw.3 + tidal_range_FT, data = temp_data_daily_2025)
+temp_lm_t3 <- lm(gdd.hobo.3 ~ gdd.crw.3 + tidal_range_FT, data = temp_data_daily_2025_t)
 summary(temp_lm_t3)
 
 # Factor tidal exchange data into 
@@ -224,6 +206,8 @@ summary(temp_lm_td3)
 
 
 # TODO Complete draft plots of lms
+
+# Plot + label for temp_lm_td2
 s <- summary(temp_lm_t2)
 b <- coef(temp_lm_t2)
 
@@ -238,6 +222,29 @@ label_txt <- paste0(
 
 ggplot(temp_data_daily_2025_t,
        aes(x = gdd.leol3s_acspo.3, y = gdd.hobo.3, color = tidal_range_FT)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red") +
+  annotate("text", x = Inf, y = Inf, label = label_txt,
+           hjust = 1.05, vjust = 1.2, size = 3.5) +
+  theme_bw()
+
+# Plot + label for temp_lm_td3
+s <- summary(temp_lm_td3)
+b <- coef(temp_lm_td3)
+
+label_txt <- paste0(
+  "gdd.hobo.3 = ", round(b[1], 3),
+  " + ", round(b["gdd.crw.3"], 3), "·gdd.crw.3",
+  " + ", round(b["tidal_range_FT"], 3), "·tidal_range_FT",
+  " + ", round(b["depth_m"], 3), "·depth_m\n",
+  "R² = ", round(s$r.squared, 3),
+  " | p(crw) = ", signif(s$coefficients["gdd.crw.3","Pr(>|t|)"], 3),
+  " | p(tidal) = ", signif(s$coefficients["tidal_range_FT","Pr(>|t|)"], 3),
+  " | p(depth) = ", signif(s$coefficients["depth_m","Pr(>|t|)"], 3)
+)
+
+ggplot(temp_data_daily_2025_MA,
+       aes(x = gdd.crw.3, y = gdd.hobo.3, color = tidal_range_FT)) +
   geom_point() +
   geom_smooth(method = "lm", color = "red") +
   annotate("text", x = Inf, y = Inf, label = label_txt,
