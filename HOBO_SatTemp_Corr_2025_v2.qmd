@@ -190,7 +190,15 @@ summary(temp_lm_2)
 temp_lm_3 <- lm(gdd.hobo.3 ~ gdd.crw.3, data = temp_data_daily_2025)
 summary(temp_lm_3)
 
-# Factor tidal exchange data into 
+# Factor only depth into models
+temp_lm_d1 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + depth_m, data = temp_data_daily_2025_MA)
+summary(temp_lm_d1)
+temp_lm_d2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3 + depth_m, data = temp_data_daily_2025_MA)
+summary(temp_lm_d2)
+temp_lm_d3 <- lm(gdd.hobo.3 ~ gdd.crw.3 + depth_m, data = temp_data_daily_2025_MA)
+summary(temp_lm_d3)
+
+# Factor only tidal exchange into models
 temp_lm_t1 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + tidal_range_FT, data = temp_data_daily_2025_t)
 summary(temp_lm_t1)
 temp_lm_t2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3 + tidal_range_FT, data = temp_data_daily_2025_t)
@@ -198,7 +206,7 @@ summary(temp_lm_t2)
 temp_lm_t3 <- lm(gdd.hobo.3 ~ gdd.crw.3 + tidal_range_FT, data = temp_data_daily_2025_t)
 summary(temp_lm_t3)
 
-# Factor tidal exchange data into 
+# Factor tidal exchange and depth into models 
 temp_lm_td1 <- lm(gdd.hobo.3 ~ gdd.jpl.3 + tidal_range_FT + depth_m, data = temp_data_daily_2025_MA)
 summary(temp_lm_td1)
 temp_lm_td2 <- lm(gdd.hobo.3 ~ gdd.leol3s_acspo.3 + tidal_range_FT + depth_m, data = temp_data_daily_2025_MA)
@@ -209,7 +217,8 @@ summary(temp_lm_td3)
 
 # TODO Complete draft plots of lms
 
-# Check model of interest
+# Check models of interest
+
 check_model(temp_lm_t2)
 
 # Plot + label for temp_lm_t2
@@ -255,32 +264,18 @@ temp_data_daily_2025_t_long <- temp_data_daily_2025_t |>
 plot_data <- temp_data_daily_2025_t |>
   pivot_longer(
     cols = c(gdd.hobo.3, gdd_hobo_pred),
-    names_to = "type",
+    names_to = "data_source",
     values_to = "gdd"
   )
 
-plot_data$type <- recode(
-  plot_data$type,
-  "gdd.hobo.3" = "Observed",
-  "gdd_hobo_pred" = "Predicted"
-)
-
-ggplot(plot_data, aes(x = date, y = gdd, color = type)) +
+ggplot(plot_data, aes(x = date, y = gdd, color = data_source)) +
   geom_line(linewidth = 0.8, na.rm = TRUE) +
   facet_wrap(~ site.id, scales = "free_y") +
   labs(
     x = "Date",
     y = "GDD",
-    color = NULL,
-    title = "Observed vs Predicted GDD (HOBO)",
-    subtitle = "Faceted by site"
   ) +
-  theme_bw() +
-  theme(
-    legend.position = "top",
-    strip.background = element_rect(fill = "grey95"),
-    panel.grid.minor = element_blank()
-  )
+  theme(legend.position = "top")
 
 
 
