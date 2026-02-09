@@ -14,9 +14,11 @@ execute:
 
 ```{r}
 # Packages
+library(tidyr)
 library(dplyr)
 library(ggplot2)
 library(ggpmisc) # for annotating plots with p & R2 of fitted polynomial via stat_poly_eq()
+library(performance)
 ```
 
 
@@ -207,7 +209,10 @@ summary(temp_lm_td3)
 
 # TODO Complete draft plots of lms
 
-# Plot + label for temp_lm_td2
+# Check model of interest
+check_model(temp_lm_t2)
+
+# Plot + label for temp_lm_t2
 s <- summary(temp_lm_t2)
 b <- coef(temp_lm_t2)
 
@@ -227,6 +232,59 @@ ggplot(temp_data_daily_2025_t,
   annotate("text", x = Inf, y = Inf, label = label_txt,
            hjust = 1.05, vjust = 1.2, size = 3.5) +
   theme_bw()
+
+
+# Predict hobo gdd with model of interest
+temp_data_daily_2025_t$gdd_hobo_pred <- predict(temp_lm_t2)
+
+# Plot hobo gdd against predicted gdd
+ggplot(temp_data_daily_2025_t, aes(x = gdd_hobo_pred, y = gdd.hobo.3)) +
+  geom_point(color = "grey") + 
+  geom_smooth(method = "lm", color = "red") +
+  # Annotate plot with simple linear model p-values and R2 values
+  stat_poly_eq(use_label("eq", "R2", "p"))
+
+# TODO - Pivot long and observe how predicted data tracks with hobo gdd over time
+temp_data_daily_2025_t_long <- temp_data_daily_2025_t |>
+  pivot_longer(
+    cols = -c(site.id, latitude, longitude, date),
+    names_to = "variable",
+    values_to = "value"
+  )
+
+plot_data <- temp_data_daily_2025_t |>
+  pivot_longer(
+    cols = c(gdd.hobo.3, gdd_hobo_pred),
+    names_to = "type",
+    values_to = "gdd"
+  )
+
+plot_data$type <- recode(
+  plot_data$type,
+  "gdd.hobo.3" = "Observed",
+  "gdd_hobo_pred" = "Predicted"
+)
+
+ggplot(plot_data, aes(x = date, y = gdd, color = type)) +
+  geom_line(linewidth = 0.8, na.rm = TRUE) +
+  facet_wrap(~ site.id, scales = "free_y") +
+  labs(
+    x = "Date",
+    y = "GDD",
+    color = NULL,
+    title = "Observed vs Predicted GDD (HOBO)",
+    subtitle = "Faceted by site"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "top",
+    strip.background = element_rect(fill = "grey95"),
+    panel.grid.minor = element_blank()
+  )
+
+
+
+
 
 # Plot + label for temp_lm_td3
 s <- summary(temp_lm_td3)
