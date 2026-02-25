@@ -1,4 +1,12 @@
 # ---- Minimal workflow test script ----
+pkgs <- c("ncdf4", "dplyr", "purrr")
+
+missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing) > 0) {
+  install.packages(missing, repos = "https://cloud.r-project.org")
+}
+
+invisible(lapply(pkgs, library, character.only = TRUE))
 
 # Always compute month folder like Data/NECOFS/2026-02
 month_folder <- format(Sys.Date(), "%Y-%m")
