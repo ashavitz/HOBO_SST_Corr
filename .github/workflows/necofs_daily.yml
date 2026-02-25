@@ -1,0 +1,88 @@
+# This workflow runs the R script NECOFS_Daily_Download.R on GitHub's servers.
+# Output: Commit of CSV output into the repo.
+
+name: NECOFS daily download
+
+on:
+  # Allows script to be run manually from the Actions tab.
+  workflow_dispatch: {}
+
+  # Run automatically once per day.
+  # GitHub cron schedules are ALWAYS in UTC.
+  # 02:00 UTC is roughly "end of day" US/Eastern:
+  #   - 9:00pm Eastern during Standard Time (EST, winter)
+  #   - 10:00pm Eastern during Daylight Time (EDT, summer)
+  # 0 = minute 0
+  # 2 = hour 2 (UTC)
+  # * * * = every day / every month / every weekday
+  schedule:
+    - cron: "0 2 * * *"
+
+# Permission to push commits back to the repository.
+permissions:
+  contents: write
+
+jobs:
+  run-necofs:
+    # Use a fresh Ubuntu machine each run. This is the default / most common choice.
+    # Free for public repos. Free up to a point for private repos.
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Pull repository code onto the runner. (Download a copy of your repository onto the temporary machine.)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history helps avoid edge cases when committing/pushing.
+          fetch-depth: 0
+
+      # 2) Install R on the runner.
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+
+      # 3) Install R package dependencies.
+      # This action can detect common dependency files (and caches installed packages between runs).
+      - name: Install R packages
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          cache-version: 1
+
+      # If you ever hit netCDF-related system dependency errors,
+      # uncomment this step (only needed for some package setups).
+      #
+      # - name: System libraries (netCDF)
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y libnetcdf-dev netcdf-bin
+
+      # 4) Run your script.
+      # Assumes NECOFS_Daily_Download.R is in the repo root.
+      # If it's in a folder, change the path (e.g., scripts/NECOFS_Daily_Download.R).
+      - name: Run NECOFS_Daily_Download.R
+        env:
+          # Make Sys.Date() and other time functions behave consistently in Eastern time.
+          TZ: America/New_York
+        run: Rscript NECOFS_Daily_Download.R
+
+      # 5) Commit and push the outputs folder (monthly subfolders are inside Data/NECOFS/).
+      # Stage only Data/NECOFS/ to avoid accidentally committing other files.
+      - name: Commit and push outputs (if changed)
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # Stage ONLY your NECOFS outputs
+          git add Data/NECOFS
+
+          # If no files changed, exit without creating a commit
+          if git diff --cached --quiet; then
+            echo "No output changes to commit."
+            exit 0
+          fi
+
+          # Commit with a date stamp
+          git commit -m "Daily NECOFS CSV: $(date -u +'%Y-%m-%d')"
+
+          # Push back to main branch
+          git push
