@@ -232,4 +232,4 @@ daily_temps <- bind_rows(hourly_temps) |>
   )
 
 # Close .nc file
-nc_close(nc)
+nc_close(nc) 
