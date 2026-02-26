@@ -7,17 +7,6 @@ on:
   # Allows script to be run manually from the Actions tab.
   workflow_dispatch: {}
 
-  # Run automatically once per day.
-  # GitHub cron schedules are ALWAYS in UTC.
-  # 10:00 UTC is roughly "morning" US/Eastern:
-  #   - 5:39am Eastern during Standard Time (EST, winter)
-  #   - 6:39am Eastern during Daylight Time (EDT, summer)
-  # 39 = minute 39
-  # 10 = hour 10 (UTC)
-  # * * * = every day / every month / every weekday
-  schedule:
-    - cron: "39 10 * * *"
-
 # Permission to push commits back to the repository.
 permissions:
   contents: write
