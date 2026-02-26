@@ -11,7 +11,7 @@ invisible(lapply(pkgs, library, character.only = TRUE))
 # ---- Build Directory ----
 # Always compute month folder like Data/NECOFS/2026-02
 month_folder <- format(Sys.Date(), "%Y-%m")
-out_dir <- file.path("Data", "NECOFS", month_folder)
+out_dir <- file.path("Data", "NECOFS", "MASSBAY_FORECAST", month_folder)
 
 # Create directory if it doesn't exist
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
