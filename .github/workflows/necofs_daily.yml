@@ -9,14 +9,14 @@ on:
 
   # Run automatically once per day.
   # GitHub cron schedules are ALWAYS in UTC.
-  # 02:00 UTC is roughly "end of day" US/Eastern:
-  #   - 9:00pm Eastern during Standard Time (EST, winter)
-  #   - 10:00pm Eastern during Daylight Time (EDT, summer)
-  # 0 = minute 0
-  # 2 = hour 2 (UTC)
+  # 10:00 UTC is roughly "morning" US/Eastern:
+  #   - 5:39am Eastern during Standard Time (EST, winter)
+  #   - 6:39am Eastern during Daylight Time (EDT, summer)
+  # 39 = minute 39
+  # 10 = hour 10 (UTC)
   # * * * = every day / every month / every weekday
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "39 10 * * *"
 
 # Permission to push commits back to the repository.
 permissions:
