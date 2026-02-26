@@ -16,7 +16,7 @@ on:
   # 2 = hour 2 (UTC)
   # * * * = every day / every month / every weekday
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "*/5 * * * *"
 
 # Permission to push commits back to the repository.
 permissions:
