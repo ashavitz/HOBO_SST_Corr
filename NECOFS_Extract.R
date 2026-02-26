@@ -233,3 +233,41 @@ daily_temps <- bind_rows(hourly_temps) |>
 
 # Close .nc file
 nc_close(nc) 
+
+
+# ---- Simple Extract of Nodes by Coordinate Location - MassBays ----
+url <- "http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forecasts/NECOFS_FVCOM_OCEAN_MASSBAY_FORECAST.nc?lon[0:1:98431],lat[0:1:98431]"
+
+nc <- nc_open(url)
+
+lon <- ncvar_get(nc, "lon")
+lat <- ncvar_get(nc, "lat")
+
+nc_close(nc)
+
+nodes <- data.frame(
+  node_id = seq_along(lon),
+  lon = lon,
+  lat = lat
+)
+
+write.csv(nodes, "MASSBAY_nodes.csv", row.names = FALSE)
+
+
+# ---- Simple Extract of Nodes by Coordinate Location - NorthEast ----
+url <- "http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forecasts/NECOFS_FVCOM_OCEAN_NORTHEAST_FORECAST.nc?lon[0:1:207080],lat[0:1:207080]"
+
+nc <- nc_open(url)
+
+lon <- ncvar_get(nc, "lon")
+lat <- ncvar_get(nc, "lat")
+
+nc_close(nc)
+
+nodes <- data.frame(
+  node_id = seq_along(lon),
+  lon = lon,
+  lat = lat
+)
+
+write.csv(nodes, "NORTHEAST_nodes.csv", row.names = FALSE)
