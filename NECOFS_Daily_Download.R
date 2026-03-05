@@ -35,10 +35,8 @@ day_stamp <- format(Sys.Date(), "%Y-%m-%d")
 
 
 # ---- Read site data and extract list of coordinates by site ----
-site_data <- read.csv("Data/site_data.csv")
-site_coords <- site_data |>
-  select(site.id, latitude, longitude) |>
-  distinct()
+site_coords_MA <- read.csv("Data/site_coords_MASSBAYS.csv")
+site_coords_NE <- read.csv("Data/site_coords.csv")
 
 
 # ---- Build custom function to determine which node is closest to a given coordinate point ----
@@ -79,24 +77,24 @@ lat <- ncvar_get(nc, "lat")
 # siglay_matrix <- ncvar_get(nc, "siglay")
 
 # Create empty columns for node index and not lat/lon coords
-site_coords$nearest_node <- NA_integer_
-site_coords$node_lat <- NA
-site_coords$node_lon <- NA
+site_coords_MA$nearest_node <- NA_integer_
+site_coords_MA$node_lat <- NA
+site_coords_MA$node_lon <- NA
 
-# Create an empty list of dfs the length of site_coords (one df for each site)
-hourly_temps <- vector("list", nrow(site_coords))
+# Create an empty list of dfs the length of site_coords_MA (one df for each site)
+hourly_temps <- vector("list", nrow(site_coords_MA))
 
 # Iterate through site coordinates df identifying the closest node and corresponding coordinates
-for (i in seq_len(nrow(site_coords))) {
+for (i in seq_len(nrow(site_coords_MA))) {
   # Determine nearest node index
-  lon0 <- site_coords$longitude[i]
-  lat0 <- site_coords$latitude[i]
+  lon0 <- site_coords_MA$longitude[i]
+  lat0 <- site_coords_MA$latitude[i]
   idx <- nearest_node(lon, lat, lon0, lat0)
-  site_coords$nearest_node[i] <- idx
+  site_coords_MA$nearest_node[i] <- idx
   
   # Use index to determine lat and lon of nearest node
-  site_coords$node_lat[i] <- lat[idx]
-  site_coords$node_lon[i] <- lon[idx]
+  site_coords_MA$node_lat[i] <- lat[idx]
+  site_coords_MA$node_lon[i] <- lon[idx]
   
   # Get all temp measurements for one node at lowest siglay (siglay index = 10)
   ts <- ncvar_get(nc, "temp",
@@ -106,7 +104,7 @@ for (i in seq_len(nrow(site_coords))) {
   
   # Build an hourly time series table for this site (one row per model timestamp) with temperature at the nearest node
   hourly_temps[[i]] <- data.frame(
-    site_id = site_coords$site.id[i],
+    site_id = site_coords_MA$site.id[i],
     time = Times,
     temp_c = as.numeric(ts)
   )
@@ -169,12 +167,12 @@ lat <- ncvar_get(nc, "lat")
 times_count <- nc$dim$time$len
 
 # Create empty columns for node index and not lat/lon coords
-site_coords$nearest_node <- NA_integer_
-site_coords$node_lat <- NA
-site_coords$node_lon <- NA
+site_coords_NE$nearest_node <- NA_integer_
+site_coords_NE$node_lat <- NA
+site_coords_NE$node_lon <- NA
 
-# Create an empty list of dfs the length of site_coords (one df for each site)
-hourly_temps <- vector("list", nrow(site_coords))
+# Create an empty list of dfs the length of site_coords_NE (one df for each site)
+hourly_temps <- vector("list", nrow(site_coords_NE))
 
 # Set up for loop:
 # Establish total time steps and chunk size
@@ -182,16 +180,16 @@ nt <- nc$dim[["time"]]$len
 chunk_size <- 24 # 1 day
 
 # Iterate through site coordinates df identifying the closest node and corresponding coordinates
-for (i in seq_len(nrow(site_coords))) {
+for (i in seq_len(nrow(site_coords_NE))) {
   # Determine nearest node index
-  lon0 <- site_coords$longitude[i]
-  lat0 <- site_coords$latitude[i]
+  lon0 <- site_coords_NE$longitude[i]
+  lat0 <- site_coords_NE$latitude[i]
   idx <- nearest_node(lon, lat, lon0, lat0)
-  site_coords$nearest_node[i] <- idx
+  site_coords_NE$nearest_node[i] <- idx
   
   # Use index to determine lat and lon of nearest node
-  site_coords$node_lat[i] <- lat[idx]
-  site_coords$node_lon[i] <- lon[idx]
+  site_coords_NE$node_lat[i] <- lat[idx]
+  site_coords_NE$node_lon[i] <- lon[idx]
   
   temp_ts <- numeric(nt)
   
@@ -210,7 +208,7 @@ for (i in seq_len(nrow(site_coords))) {
     temp_ts[t0:t1] <- as.numeric(vals)
     
     message(
-      "Site ", site_coords$site.id[i],
+      "Site ", site_coords_NE$site.id[i],
       " progress: ", t0, "-", t1, " / ", nt,
       " (", Times[t0], " to ", Times[t1], ")"
     )
@@ -218,13 +216,13 @@ for (i in seq_len(nrow(site_coords))) {
   
   # Build an hourly time series table for this site (one row per model timestamp) with temperature at the nearest node
   hourly_temps[[i]] <- data.frame(
-    site_id = site_coords$site.id[i],
+    site_id = site_coords_NE$site.id[i],
     time = Times,
     temp = temp_ts
   )
   
   # # Update user on progress in Console
-  # message("Site ", site_coords$site.id[i], " completed.")
+  # message("Site ", site_coords_NE$site.id[i], " completed.")
 }
 
 # Create df of hourly temps
