@@ -65,6 +65,11 @@ URL <- "http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forec
 nc <- nc_open(URL)
 
 # Get time range
+# On any given day, the date range available for this data set is foretasted *two* days
+# forward, plus one additional hourly time point at midnight the next day, and *three* days back.
+# For example data requested the evening of March 5th will include data from midnight of
+# March 2nd through March 7th, plus the midnight value on March 8th.
+# This makes a total of 145 hourly values.
 Times <- ncvar_get(nc, "Times")
 
 # Extract all longitude and latitude values
@@ -136,21 +141,43 @@ write.csv(hourly_temps, out_csv, row.names = FALSE)
 # Link to NECOFS_FVCOM_OCEAN_NORTHEAST_FORECAST.nc THREDDS page:
 # http://www.smast.umassd.edu:8080/thredds/catalog/models/fvcom/NECOFS/Forecasts/catalog.html?dataset=models/NECOFS/Forecasts/NECOFS_FVCOM_OCEAN_NORTHEAST_FORECAST.nc
 
+# Set the base OpenDAP URL
 base_URL <- "http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forecasts/NECOFS_FVCOM_OCEAN_NORTHEAST_FORECAST.nc"
+
+# Access just the time variable variable, to see the available time range.
+# The "?" before a variable, after the base URL, accesses the entire available range of that variable.
 nc_time <- nc_open(paste0(base_URL, "?time"))
+
+# Read the number of times currently in the forecast data set
 nt <- nc_time$dim$time$len
+
+# Close remote link to the data set
 nc_close(nc_time)
 
+# On any given day, the date range available for this data set is a foretasted *five* days
+# forward, plus one additional hourly time point at midnight the next day.
+# The forecast also includes a seemingly variable number of retroactive days.
+# To limit the amount of data requested, this script requests a total of 8 days prior to the
+# date of the latest forecast, which results in *two* days back.
+# For example data requested the evening of March 5th will include data from midnight of
+# March 2nd through March 9th, plus the midnight value on March 10th.
+# This makes a total of 193 hourly values.
+
+# Set the starting day (time index) to be 193 hours prior to the furthest out forecast
 last_idx_0 <- nt - 1        # 0-based last index
-first_idx_0 <- max(0, last_idx_0 - 191) # 8 days prior to the latest forecast
+first_idx_0 <- max(0, last_idx_0 - 192) # 8 days prior to the furthest forecast
 
 time_slice <- paste0("[", first_idx_0, ":1:", last_idx_0, "]")
 
+# Build the data request URL. Request all lat & lon, and request time, Times, and t
 URL <- paste0(
   base_URL,
+  # Request all lat & lon. Request limited range of times
   "?lon,lat,time", time_slice,
+  # Request limited range of the variable Times
   ",Times", time_slice,
-  ",temp", time_slice, "[44:1:44][0:1:207080]"
+  # Request temperatures for limited time range, for only the bottom sigma layer (node 44, nearest bottom water), for all lat & lon 
+  ",temp", time_slice, "[44:1:44][0:1:207080]" 
 )
 
 # Open netCDF file to read data
@@ -220,9 +247,6 @@ for (i in seq_len(nrow(site_coords_NE))) {
     time = Times,
     temp = temp_ts
   )
-  
-  # # Update user on progress in Console
-  # message("Site ", site_coords_NE$site.id[i], " completed.")
 }
 
 # Create df of hourly temps

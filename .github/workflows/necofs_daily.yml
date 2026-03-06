@@ -1,4 +1,5 @@
 # This workflow runs the R script NECOFS_Daily_Download.R on GitHub's servers.
+# The workflow is scheduled to be triggered via cron-job.org once daily.
 # Output: Commit of CSV output into the repo.
 
 name: NECOFS daily download
@@ -14,11 +15,13 @@ permissions:
 jobs:
   run-necofs:
     # Use a fresh Ubuntu machine each run. This is the default / most common choice.
+    # Basically, when this is triggered, it builds a virtual computer (temporary machine) which installs
+    # R, runs the script, and then erases the virtual computer.
     # Free for public repos. Free up to a point for private repos.
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Pull repository code onto the runner. (Download a copy of your repository onto the temporary machine.)
+      # 1) Pull repository code onto the runner. (Download a copy of the repository onto the temporary machine.)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -35,7 +38,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libnetcdf-dev netcdf-bin libhdf5-dev
 
-      # 4) Run your script.
+      # 4) Run the script.
       # Assumes NECOFS_Daily_Download.R is in the repo root.
       # If it's in a folder, change the path (e.g., scripts/NECOFS_Daily_Download.R).
       - name: Run NECOFS_Daily_Download.R
