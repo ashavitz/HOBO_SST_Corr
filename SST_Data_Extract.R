@@ -23,8 +23,9 @@ library(RNetCDF)
 library(ncdf4)
 
 # ---- Prepare request df ----
+# ## Using the following sites and HOBO Temp already included
+# # Sites "AQ" "CB" "DC" "SH" "WB" "CC" "OB" "WC" "GB" "NK" "JB" "CL"
 site_data <- read.csv("Data/site_data.csv")
-
 
 # ---- NASA JPL Multi-scale Ultra-high Resolution (MUR) SST----
   
