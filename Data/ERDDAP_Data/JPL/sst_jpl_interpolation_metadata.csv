@@ -1,0 +1,15 @@
+site.id,latitude,longitude,dataset name,interpolation method
+AQ,42.53003,-70.852886,sst_jpl,none (within grid cell)
+CB,42.6572,-70.68275,sst_jpl_n4,nearest neighbor n=4
+CC,41.595157,-70.911218,sst_jpl_n4,nearest neighbor n=4
+CL,41.380007,-71.516065,sst_jpl_n4,nearest neighbor n=4
+DC,42.66801,-70.67422,sst_jpl_n4,nearest neighbor n=4
+GB,41.524995,-70.673056,sst_jpl_n4,nearest neighbor n=4
+JB,41.49758,-71.36642,sst_jpl,none (within grid cell)
+NK,41.36441,-71.65471,sst_jpl_ID2_16,IDW n=16
+OB,41.741083,-70.657151,sst_jpl,none (within grid cell)
+SH,42.00343,-70.61506,sst_jpl,none (within grid cell)
+WB,42.55635,-70.80848,sst_jpl_n4,nearest neighbor n=4
+WC,41.690511,-70.647106,sst_jpl_n4,nearest neighbor n=4
+PV,42.42002,-70.91592,sst_jpl,none (within grid cell)
+NB,42.59809,-70.65669,sst_jpl,none (within grid cell)

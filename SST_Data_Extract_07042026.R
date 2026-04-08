@@ -11,7 +11,7 @@ library(rerddap)
 library(rerddapXtracto)
 
 # ---- User Inputs ----
-sites <- c("NB")  # change this to any site(s)
+sites <- c("PV")  # change this to any site(s)
 date_range <- seq(as.Date("2024-04-16"), as.Date("2025-10-22"), by = "day")
 
 # Create a label for folder/file naming (e.g., "PV" or "PV_WB_CB")
@@ -91,7 +91,7 @@ for (i in seq_along(chunk_starts)) {
 }
 
 # ---- Combine All Chunks ----
-sst_jpl <- list.files(
+sst_jpl_PV <- list.files(
   out_dir,
   full.names = TRUE,
   pattern = "\\.csv$"
@@ -100,3 +100,15 @@ sst_jpl <- list.files(
 
 # Optional: save combined file
 # readr::write_csv(sst_jpl, file.path(out_dir, paste0("sst_jpl_", site_label, "_all.csv")))
+
+
+temp_data_daily <- readRDS("Data/sst_hobo_sites.rds") |> 
+  select(site.id, date, sst_jpl_interp) |> 
+  rename(sst_jpl = sst_jpl_interp)
+
+temp_data_daily_2 <- temp_data_daily |> 
+  rbind(sst_jpl_PV) |> 
+  rbind(sst_jpl_NB)
+
+# Save file
+readr::write_csv(temp_data_daily_2, "Data/ERDDAP_Data/JPL/sst_daily_jpl.csv")
