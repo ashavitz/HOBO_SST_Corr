@@ -11,7 +11,7 @@ library(rerddap)
 library(rerddapXtracto)
 
 # ---- User Inputs ----
-sites <- c("PV")  # change this to any site(s)
+sites <- c("NB")  # change this to any site(s)
 date_range <- seq(as.Date("2024-04-16"), as.Date("2025-10-22"), by = "day")
 
 # Create a label for folder/file naming (e.g., "PV" or "PV_WB_CB")
