@@ -11,7 +11,7 @@ library(rerddap)
 library(rerddapXtracto)
 
 # ---- User Inputs ----
-sites <- c("NB")  # change this to any site(s)
+sites <- c("PV")  # change this to any site(s)
 date_range <- seq(as.Date("2024-04-16"), as.Date("2025-10-22"), by = "day")
 
 # Create a label for folder/file naming (e.g., "PV" or "PV_WB_CB")
@@ -78,7 +78,7 @@ for (i in seq_along(chunk_starts)) {
       mutate(
         site.id = chunk_data$site.id,
         date = as.Date(requested.date),
-        sst_jpl = mean.analysed_sst,
+        sst_jpl = round(mean.analysed_sst, 3), # precision is only 3 decimal places
         .keep = "none"
       )
     
