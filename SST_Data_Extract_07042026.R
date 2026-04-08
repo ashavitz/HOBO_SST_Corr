@@ -1,133 +1,102 @@
-# Purpose: Extract SST data from various satellite SST data sets.
-# The following code employs the ERDDAP Interpolate Service via rerddapXtracto::rxtracto
-# Info on ERDDAP interpolate service: https://coastwatch.pfeg.noaa.gov/erddap/convert/interpolate.html
-# The following interpolation methods are used:
-#   - Nearest neighbor interpolation: The nearest n grid cells are checked (including the cell in which the coordinate point falls) and returns the nearest non-NaN cell value.
-#   - Inverse distance squared interpolation: Returns the inverse distance interpolation of the nearest n non-NaN data values.
-#     The weight for each nearby data value is w = 1/(D^2) where D is the cell indexed distance.
+# Purpose: Extract daily SST from NASA JPL MUR via ERDDAP (rerddapXtracto).
+#          Runs in weekly chunks for robustness and saves incrementally as CSVs.
+#          Output directory and filenames are dynamic based on selected site(s).
 
 # ---- Load Packages ----
 library(dplyr)
 library(tidyr)
-library(ggplot2)
-library(lubridate)
-library(purrr) #for plot function code; map function
-library(zoo) #approx nas from neighbors
-
-# ERRDAP Data Access
-library(rerddap) # For reading ERDDAP data
+library(purrr)
+library(readr)
+library(rerddap)
 library(rerddapXtracto)
 
-# THREDDS NetCDF file access
-library(RNetCDF)
-library(ncdf4)
+# ---- User Inputs ----
+sites <- c("NB")  # change this to any site(s)
+date_range <- seq(as.Date("2024-04-16"), as.Date("2025-10-22"), by = "day")
 
-# ---- Prepare request df ----
-## Using the following sites, and not including HOBO data:
-# Sites "AQ" "CB" "DC" "SH" "WB" "CC" "OB" "WC" "GB" "NK" "JB" "CL" "PV" "NB"
-# sites <- c("AQ", "CB", "DC", "SH", "WB", "CC", "OB", "WC", "GB", "NK", "JB", "CL", "PV", "NB")
-sites <- c("PV")
-site_data <- read.csv("Data/site_coords.csv") |>
+# Create a label for folder/file naming (e.g., "PV" or "PV_WB_CB")
+site_label <- paste(sites, collapse = "_")
+
+# ---- Prepare Site + Date Grid ----
+site_coords <- read.csv("Data/site_coords.csv") |>
   filter(site.id %in% sites)
 
-date_range <- seq(as.Date("2024-04-16"), as.Date("2024-06-22"), by = "day")
+site_data <- expand_grid(
+  site.id = sites,
+  date = date_range
+) |>
+  left_join(site_coords, by = "site.id") |>
+  mutate(date = as.Date(date))
 
-# Create the full grid of sites and dates
-sites_date_range <- expand_grid(
-  site.id = sites, 
-  date = as.character(date_range)
+# ---- ERDDAP Dataset Info ----
+jplMURSST41_info <- rerddap::info(
+  "jplMURSST41",
+  url = "https://coastwatch.pfeg.noaa.gov/erddap"
 )
 
-# Join back your latitude and longitude
-site_data <- site_data |> 
-  left_join(sites_date_range, by = "site.id")
+# ---- Output Directory ----
+out_dir <- file.path("Data/ERDDAP_Data/JPL", paste0("jpl_chunks_", site_label))
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-# ---- NASA JPL Multi-scale Ultra-high Resolution (MUR) SST----
+# ---- Define Weekly Chunks ----
+chunk_starts <- seq.Date(min(site_data$date), max(site_data$date), by = "7 days")
 
-## Extract ERDDAP JPL satellite SST data 
-### jplMURSST41
-
-# - NASA JPL 
-# - Acknowledgement: These data were provided by JPL under support by NASA MEaSUREs program. 
-# - Multi-scale Ultra-high Resolution (MUR) SST Analysis fv04.1, Global, 0.01°, 2002-present, Daily 
-# - (https://coastwatch.pfeg.noaa.gov/erddap/info/jplMURSST41/index.html) 
-# - Metadata: https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1
-
-# Extract metadata from NOAA ERDDAP
-# NOTE - jplMURSST41 is hosted at https://coastwatch.pfeg.noaa.gov/erddap, however this erddap
-# appears to be intermittently inaccessible, causing script to crash.
-jplMURSST41_info <-
-  rerddap::info("jplMURSST41",
-                url="https://coastwatch.pfeg.noaa.gov/erddap"
+# ---- Loop Over Chunks ----
+for (i in seq_along(chunk_starts)) {
+  
+  start_date <- chunk_starts[i]
+  end_date <- min(start_date + 6, max(site_data$date))
+  
+  file_name <- file.path(
+    out_dir,
+    sprintf(
+      "sst_%s_%s.csv",
+      format(start_date, "%Y%m%d"),
+      format(end_date, "%Y%m%d")
+    )
   )
+  
+  if (file.exists(file_name)) next  # skip completed chunks
+  
+  chunk_data <- site_data |>
+    filter(date >= start_date, date <= end_date)
+  
+  tryCatch({
+    
+    out <- rxtracto(
+      jplMURSST41_info,
+      parameter = "analysed_sst",
+      tcoord = as.character(chunk_data$date),
+      xcoord = chunk_data$longitude,
+      ycoord = chunk_data$latitude,
+      xlen = 0,
+      ylen = 0,
+      progress_bar = TRUE
+    )
+    
+    out_df <- as.data.frame(out) |>
+      mutate(
+        site.id = chunk_data$site.id,
+        date = as.Date(requested.date),
+        sst_jpl = mean.analysed_sst,
+        .keep = "none"
+      )
+    
+    readr::write_csv(out_df, file_name)
+    message("saved: ", file_name)
+    
+  }, error = function(e) {
+    message("failed: ", file_name, " -- ", e$message)
+  })
+}
 
-# set parameters for use in rerddapXtracto::rxtracto()
-parameter <- 'analysed_sst'
-xcoord <- site_data$longitude
-ycoord <- site_data$latitude
-tcoord <- site_data$date
+# ---- Combine All Chunks ----
+sst_jpl <- list.files(
+  out_dir,
+  full.names = TRUE,
+  pattern = "\\.csv$"
+) |>
+  map_dfr(readr::read_csv, show_col_types = FALSE)
 
-# NOTE:
-# - rxtracto() returns a list of statistics around the points provided via xcoord and ycoord
-# - xlen and ylen denote the size (degrees) of the surrounding box from which you
-#   want statistics. The default for these is 0, which will extract data for the grid cell
-#   in which each coordinate provided falls.
-
-# Extract SST data with no interpolation
-extract_jpl <- rxtracto(jplMURSST41_info,
-                        parameter = parameter,
-                        tcoord = tcoord,
-                        xcoord = xcoord, ycoord = ycoord,
-                        xlen = 0.0, ylen = 0.0,
-                        # interp = c("Nearest", "4"),
-                        progress_bar = TRUE)
-
-# # saveRDS(extract_jpl, "Data/ERDDAP_Data/sst_JPL.rds")
-# # saveRDS(extract_jpl_0.05mean, "Data/ERDDAP_Data/sst_JPL_0.05mean.rds")
-# 
-# # Extract SST data using nearest neighbor interpolation for 4 grid cells.
-# extract_jpl_n4 <- rxtracto(jplMURSST41_info,
-#                            parameter = parameter,
-#                            tcoord = tcoord,
-#                            xcoord = xcoord, ycoord = ycoord,
-#                            xlen = 0.0, ylen = 0.0,
-#                            interp = c("Nearest", "4"),
-#                            progress_bar = TRUE)
-# 
-# # saveRDS(extract_jpl_n4, "Data/ERDDAP_Data/sst_JPL_n4.rds")
-# 
-# # Extract SST data using inverse distance squared interpolation for 16 cells.
-# extract_jpl_ID2_16 <- rxtracto(jplMURSST41_info,
-#                                parameter = parameter,
-#                                tcoord = tcoord,
-#                                xcoord = xcoord, ycoord = ycoord,
-#                                xlen = 0.0, ylen = 0.0,
-#                                interp = c("InverseDistance2", "16"),
-#                                progress_bar = TRUE)
-# 
-# # saveRDS(extract_jpl_ID2_16, "Data/ERDDAP_Data/sst_JPL_ID2_16.rds")
-# 
-# # Read data
-# extract_jpl <- readRDS("Data/ERDDAP_Data/sst_JPL.rds")
-# extract_jpl_n4 <- readRDS("Data/ERDDAP_Data/sst_JPL_near4.rds") |> 
-#   as.data.frame() |> 
-#   rename(date = time,
-#          sst_jpl_n4 = analysed_sst)
-# extract_jpl_ID2_16 <- readRDS("Data/ERDDAP_Data/sst_JPL_ID2_16.rds") |> 
-#   as.data.frame() |> 
-#   rename(date = time,
-#          sst_jpl_ID2_16 = analysed_sst)
-
-
-# Extract relevant data
-sst_jpl <- extract_jpl |> 
-  as.data.frame() |> 
-  mutate(
-    site.id = site_data$site.id,
-    date = as.Date(requested.date),
-    sst_jpl = mean.analysed_sst,
-    .keep = "none")
-
-
-
-write.csv(sst_jpl, "Data/ERDDAP_Data/sst_JPL_PV_1.csv")
+# Optional: save combined file
+# readr::write_csv(sst_jpl, file.path(out_dir, paste0("sst_jpl_", site_label, "_all.csv")))
